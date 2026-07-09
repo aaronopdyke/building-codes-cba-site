@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — Building Codes CBA</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%9A%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="brand">Building Codes CBA <span>· seismic cost-benefit demo</span></div>
+  <nav>
+    <a href="index.html">Explorer</a>
+    <a href="about.html" class="active">About</a>
+  </nav>
+</header>
+
+<div class="content">
+  <h1>About this demo</h1>
+  <p class="lede">A cost-benefit explorer for seismic building-code adoption and
+  enforcement. For each country it models today's building stock on a 1&nbsp;km grid
+  (floor areas &times; unit construction costs &times; GEM building typologies &times;
+  construction-vintage code levels), pairs it with GEM vulnerability functions and the
+  GEM seismic hazard map, and runs a 2025&ndash;2075 cost-benefit analysis of raising new
+  construction to the next code level &mdash; across all five SSP growth scenarios.</p>
+
+  <h2>What the map shows</h2>
+  <p>Final outputs aggregated onto H3 hexagons (size auto-scaled to the country;
+  roughly 36&ndash;253&nbsp;km&sup2; per hex). Values are summed per hex and ratios derived
+  after aggregation:</p>
+  <ul>
+    <li><strong>BCR</strong> — discounted avoided losses &divide; discounted costs (SSP2).
+      National program costs (code development, enforcement, training) are allocated to
+      hexes by their share of discounted new-construction value.</li>
+    <li><strong>Avoided losses</strong> — NPV of avoided structural + contents losses (SSP2).</li>
+    <li><strong>AAL</strong> — baseline 2025 average annual loss (USD/yr).</li>
+    <li><strong>AAL / value</strong> — AAL as a share of replacement value.</li>
+  </ul>
+
+  <h2>Retrofit priorities</h2>
+  <p>Code changes only reach new construction. The retrofit table ranks the existing
+  stock's building classes by avoided AAL if retrofitted: engineered classes move one
+  code level up (GEM curves); non-engineered classes (adobe, unreinforced masonry,
+  timber) get a heuristic 35% damage reduction. Costs are a percentage of replacement
+  value by material (MUR 30%, CR 20%, W/S 15%, default 25%). These are screening
+  assumptions for TA targeting, not engineering estimates.</p>
+
+  <h2>Key assumptions &amp; caveats</h2>
+  <ul>
+    <li>Benefits count avoided structural + contents losses; <strong>lives saved are
+      reported separately and not monetised</strong> in the BCR.</li>
+    <li>The construction premium applies to all complying new floor area regardless of
+      local hazard — country-wide BCRs are lower than hazard-targeted enforcement.</li>
+    <li>Compliance is scaled by a building practice factor (WGI + subnational
+      corruption + education, after Daniell et al. 2014).</li>
+    <li>Hazard: GEM PGA 475yr, other return periods log-linearly scaled.</li>
+    <li>All five SSPs are identical in 2025 and diverge after.</li>
+  </ul>
+
+  <h2>Data &amp; licenses</h2>
+  <ul>
+    <li><a href="https://github.com/gem/global_vulnerability_model">GEM Global
+      Vulnerability Model</a> — CC BY-SA 4.0.</li>
+    <li><a href="https://github.com/gem/global_exposure_model">GEM Global Exposure
+      Model</a> taxonomy composition &amp; costs via the
+      <a href="https://aaronopdyke.github.io/UCC-database/">UCC Database</a>.</li>
+    <li>GEM Global Seismic Hazard Map; GHSL built-up vintages (CC BY 4.0); World Bank
+      Official Boundaries (CC BY 4.0); World Bank API indicators (CC BY 4.0).</li>
+  </ul>
+  <p class="note">This page only serves aggregated results (hex tiles, country
+  metrics). No source datasets are redistributed here. The password gate on this site
+  is demo-grade client-side protection: the underlying data files remain fetchable by
+  direct URL. Long-term data storage and access control are open items — for now,
+  sources stay in private storage and only these aggregates are published.</p>
+</div>
+
+<footer class="site-footer">
+  <span data-meta-line></span>
+</footer>
+<script src="assets/app.js" data-page="about"></script>
+</body>
+</html>
