@@ -137,8 +137,11 @@
       [(100 * m.aal_pct_gdp_2025).toFixed(1) + "%", "AAL as % of GDP"],
       [fmtInt.format(m.baseline_fatalities_2025_per_yr), "Expected fatalities /yr"],
       [ssp2.bcr.toFixed(2), "BCR (SSP2)"],
-      [ssp2.break_even_year || "—", "Break-even year"],
+      [ssp2.bcr_with_lives != null ? ssp2.bcr_with_lives.toFixed(2) : "—",
+       "BCR incl. lives (side)"],
       [fmtInt.format(ssp2.lives_saved), "Lives saved to 2075"],
+      [fmtInt.format(ssp2.job_years), "Job-years preserved"],
+      [ssp2.break_even_year || "—", "Break-even year"],
     ];
     document.getElementById("tiles").innerHTML = tiles
       .map(([v, k]) => '<div class="tile"><div class="v">' + v + '</div><div class="k">' + k + "</div></div>")
