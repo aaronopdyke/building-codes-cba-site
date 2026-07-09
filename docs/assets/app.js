@@ -192,6 +192,52 @@
       fmtUsd(ssp2row.npv_costs_usd) + " (5% discount rate). Lives saved are not monetised.";
   }
 
+  const DIV_COLORS = { D1: "#1a9850", D2: "#2a78d6", D3: "#9467bd" };
+  const DIV_LABELS = {
+    D1: "1st — avoided losses when disasters strike",
+    D2: "2nd — unlocked economic potential (incl. jobs)",
+    D3: "3rd — co-benefits of the investment itself",
+  };
+
+  function renderDividends(dv) {
+    const el = document.getElementById("dividends");
+    const note = document.getElementById("dividends-note");
+    if (!dv) { el.innerHTML = "<p class='note'>No dividends data.</p>"; note.textContent = ""; return; }
+    const total = dv.total_npv || 1;
+    const W = 420, H = 26;
+    let x = 0, bar = "";
+    for (const d of ["D1", "D2", "D3"]) {
+      const v = dv[d.toLowerCase() + "_npv"] || 0;
+      const w = Math.max(0, (v / total) * W);
+      bar += '<rect x="' + x.toFixed(1) + '" y="0" width="' + Math.max(w, 0).toFixed(1) +
+        '" height="' + H + '" fill="' + DIV_COLORS[d] + '"><title>' + DIV_LABELS[d] +
+        ": " + fmtUsd(v) + "</title></rect>";
+      x += w;
+    }
+    let rows = "";
+    for (const d of ["D1", "D2", "D3"]) {
+      const v = dv[d.toLowerCase() + "_npv"] || 0;
+      rows += '<tr><td><span class="swatch" style="background:' + DIV_COLORS[d] +
+        '"></span>' + DIV_LABELS[d] + '</td><td class="num">' + fmtUsd(v) + "</td></tr>";
+    }
+    rows += '<tr><td><strong>Total dividends</strong></td><td class="num"><strong>' +
+      fmtUsd(dv.total_npv) + "</strong></td></tr>" +
+      '<tr><td>Program costs</td><td class="num">' + fmtUsd(dv.npv_costs) + "</td></tr>" +
+      '<tr><td>Triple-dividend ratio</td><td class="num"><strong>' +
+      (dv.ratio != null ? dv.ratio.toFixed(2) : "—") + "</strong> (headline BCR " +
+      dv.bcr_headline.toFixed(2) + ")</td></tr>";
+    const c = dv.counts || {};
+    el.innerHTML =
+      '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;margin-bottom:0.5rem">' +
+      bar + "</svg><table>" + rows + "</table>";
+    note.innerHTML =
+      "Counts (not $): D1 lives saved " + fmtInt.format(c.lives_saved || 0) +
+      " · D2 job-years preserved " + fmtInt.format(c.job_years_preserved || 0) +
+      " + created " + fmtInt.format(c.job_years_created || 0) + ". " +
+      'Framework: <a href="' + dv.url + '">Triple Dividend of Resilience</a> ' +
+      "(Tanner et al., ODI/GFDRR/World Bank). " + dv.note;
+  }
+
   function renderRetrofit(rj) {
     const tbl = document.getElementById("retrofit-table");
     if (!rj) { tbl.innerHTML = "<tr><td>No retrofit data.</td></tr>"; return; }
@@ -241,6 +287,7 @@
     }
     renderTiles(mp);
     if (streamsText) renderChart(parseCsv(streamsText), mp);
+    renderDividends(mp.dividends);
     renderRetrofit(rj);
   }
 
