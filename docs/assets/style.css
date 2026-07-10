@@ -154,6 +154,17 @@ select {
 }
 
 /* ---- side panel ---- */
+.scenario {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.8rem;
+  margin: 0 0 0.9rem;
+  font-size: 0.86rem;
+  color: var(--ink-2);
+}
+.scenario strong { color: var(--ink); }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.6rem; margin-bottom: 0.9rem; }
 .tile {
   background: var(--surface);

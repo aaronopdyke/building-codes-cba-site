@@ -64,24 +64,37 @@ TEMPLATE = """<!DOCTYPE html>
 <script>
 const SALT = "{salt}", IV = "{iv}", DATA = "{data}", ITER = {iterations};
 const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function unlock(pwText) {{
+  const pw = new TextEncoder().encode(pwText);
+  const km = await crypto.subtle.importKey("raw", pw, "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    {{ name: "PBKDF2", salt: b64(SALT), iterations: ITER, hash: "SHA-256" }},
+    km, {{ name: "AES-GCM", length: 256 }}, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt(
+    {{ name: "AES-GCM", iv: b64(IV) }}, key, b64(DATA));
+  const html = new TextDecoder().decode(plain);
+  try {{ sessionStorage.setItem("bccba_pw", pwText); }} catch (e) {{}}
+  document.open(); document.write(html); document.close();
+}}
 document.getElementById("f").addEventListener("submit", async ev => {{
   ev.preventDefault();
   const err = document.getElementById("err");
   err.textContent = "";
   try {{
-    const pw = new TextEncoder().encode(document.getElementById("pw").value);
-    const km = await crypto.subtle.importKey("raw", pw, "PBKDF2", false, ["deriveKey"]);
-    const key = await crypto.subtle.deriveKey(
-      {{ name: "PBKDF2", salt: b64(SALT), iterations: ITER, hash: "SHA-256" }},
-      km, {{ name: "AES-GCM", length: 256 }}, false, ["decrypt"]);
-    const plain = await crypto.subtle.decrypt(
-      {{ name: "AES-GCM", iv: b64(IV) }}, key, b64(DATA));
-    const html = new TextDecoder().decode(plain);
-    document.open(); document.write(html); document.close();
+    await unlock(document.getElementById("pw").value);
   }} catch (e) {{
     err.textContent = "Wrong password.";
   }}
 }});
+// enter the password once per browser tab: reuse it silently across pages
+(async () => {{
+  let stored = null;
+  try {{ stored = sessionStorage.getItem("bccba_pw"); }} catch (e) {{}}
+  if (stored) {{
+    try {{ await unlock(stored); }}
+    catch (e) {{ try {{ sessionStorage.removeItem("bccba_pw"); }} catch (e2) {{}} }}
+  }}
+}})();
 </script>
 </body>
 </html>

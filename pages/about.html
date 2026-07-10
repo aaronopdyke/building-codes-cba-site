@@ -45,26 +45,27 @@
   dollar counted exactly once:</p>
   <ul>
     <li><strong>1st dividend — avoided losses when disasters strike</strong>: the
-      headline avoided structural + contents losses, plus avoided displacement costs
-      and the embodied carbon of avoided reconstruction (valued at the World Bank
-      shadow price of carbon). Lives saved are annotated as a count.</li>
+      headline avoided structural + contents losses (direct damage only), plus the
+      embodied carbon of avoided reconstruction — carbon intensity from
+      <strong>GEM's carbon accounting</strong> (CARBON_BUILDINGS_TON in the exposure
+      model), valued at the World Bank shadow price of carbon. Lives saved and DALYs
+      averted are annotated as counts.</li>
     <li><strong>2nd dividend — unlocked economic potential</strong>: the GDP stimulus
       of the code program's spending (public-investment multipliers — IMF 2014
       0.25/0.5, Adarov 2024/Ardanaz 2025 1.1 reference, Barbero 2024 RRF 1.22;
       multiplier channel only), with jobs preserved and created annotated as
       counts.</li>
-    <li><strong>3rd dividend — co-benefits of the investment itself</strong>, accruing
-      yearly on the code-compliant new stock whether or not an earthquake occurs:
-      energy savings and their carbon value (only where green provisions ride with the
-      code), reduced everyday fire losses, and health gains from better construction
-      quality (DALYs valued at GDP per capita). Everyday structural safety and
-      accessibility are explicit placeholders pending defensible parameters.</li>
+    <li><strong>3rd dividend — co-benefits of the investment itself</strong>:
+      durability — code-compliant construction lasts longer, so the annualized cost
+      of premature replacement falls on the compliant new stock (service life
+      50→60 years ≈ 0.33%/yr of compliant value).</li>
   </ul>
-  <p class="note">All third-dividend parameters are screening defaults (CTIF fire
-  statistics order, WHO housing-and-health order, WB carbon shadow price) meant to be
-  replaced with country values. The triple-dividend ratio is <em>not</em> a strict
-  benefit-cost ratio: the second dividend counts the stimulus of the program's own
-  spending, which is simultaneously a cost in the headline BCR.</p>
+  <p class="note">There is exactly <strong>one benefit-cost ratio</strong> on this
+  site: the headline BCR (avoided direct losses ÷ costs), identical in the summary
+  tiles, the cumulative chart, and every hex cell on the map. Dividend totals are
+  context, never a second ratio. DALYs are estimated from fatalities (GEM publishes
+  no injury functions): deaths × years of life lost (WB life expectancy) plus an
+  injury ratio — parameters stated in the notebook outputs.</p>
 
   <h2>Retrofit priorities</h2>
   <p>Code changes only reach new construction. The retrofit table ranks the existing
@@ -84,8 +85,10 @@
       employment units (avoided losses &divide; GDP per labor hour &divide; 2,000
       hours/yr) — they are never added to the BCR as dollars, which would double-count
       the same losses.</li>
-    <li>The construction premium applies to all complying new floor area regardless of
-      local hazard — country-wide BCRs are lower than hazard-targeted enforcement.</li>
+    <li>The construction premium is priced as a percentage of each location's unit
+      construction cost (default 3% for a one-level upgrade; sensitivity 1–12% in the
+      notebook) and applies to all complying new floor area regardless of local
+      hazard — country-wide BCRs are lower than hazard-targeted enforcement.</li>
     <li>Compliance is scaled by a building practice factor (WGI + subnational
       corruption + education, after Daniell et al. 2014).</li>
     <li>Hazard: GEM PGA 475yr, other return periods log-linearly scaled.</li>
@@ -93,14 +96,20 @@
   </ul>
 
   <h2>Data &amp; licenses</h2>
+  <p>This site and all results are licensed
+  <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>
+  (non-commercial, attribution, share-alike), matching the most restrictive upstream
+  data license (GEM). Sources:</p>
   <ul>
     <li><a href="https://github.com/gem/global_vulnerability_model">GEM Global
-      Vulnerability Model</a> — CC BY-SA 4.0.</li>
+      Vulnerability Model</a> — CC BY-NC-SA 4.0.</li>
     <li><a href="https://github.com/gem/global_exposure_model">GEM Global Exposure
-      Model</a> taxonomy composition &amp; costs via the
-      <a href="https://aaronopdyke.github.io/UCC-database/">UCC Database</a>.</li>
-    <li>GEM Global Seismic Hazard Map; GHSL built-up vintages (CC BY 4.0); World Bank
-      Official Boundaries (CC BY 4.0); World Bank API indicators (CC BY 4.0).</li>
+      Model</a> (taxonomies, costs, contents, carbon accounting) via the
+      <a href="https://aaronopdyke.github.io/UCC-database/">UCC Database</a> —
+      CC BY-NC-SA 4.0.</li>
+    <li>GEM Global Seismic Hazard Map (CC BY-NC-SA 4.0); GHSL built-up vintages
+      (CC BY 4.0); World Bank Official Boundaries (CC BY 4.0); World Bank API
+      indicators (CC BY 4.0); USGS ShakeMap (public domain).</li>
   </ul>
   <p class="note">This page only serves aggregated results (hex tiles, country
   metrics). No source datasets are redistributed here. The password gate on this site

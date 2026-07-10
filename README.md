@@ -41,9 +41,9 @@ fetchable by direct URL, and the repo itself is public. Do not publish
 sensitive data here. Rotating the password = re-running `tools/protect.py`
 and pushing.
 
-## Licenses / attribution
+## License / attribution
 
-Results derive from the GEM Global Vulnerability Model (CC BY-SA 4.0), GEM
-Global Exposure Model taxonomies/costs (via the UCC Database), the GEM Global
-Seismic Hazard Map, GHSL (CC BY 4.0), World Bank boundaries and indicators
-(CC BY 4.0). See the site's About page for method and caveats.
+**CC BY-NC-SA 4.0** — see [LICENSE](LICENSE). Matches the GEM Global
+Vulnerability + Exposure Model licenses (CC BY-NC-SA 4.0) the results derive
+from; GHSL and World Bank inputs are CC BY 4.0 and attributed in the LICENSE
+file. See the site's About page for method and caveats.

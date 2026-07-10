@@ -129,17 +129,47 @@
     drawLegend(state.metric, bins);
   }
 
+  function renderScenario(mp) {
+    const el = document.getElementById("scenario");
+    if (!el) return;
+    const it = (mp.metrics || {}).intervention || {};
+    const p = (mp.metrics || {}).practice_p_national;
+    const dr = (mp.metrics || {}).discount_rate;
+    let head;
+    if (it.kind === "code_upgrade") {
+      head = "<strong>Scenario:</strong> new construction raised from <strong>" +
+        (it.in_force || "?") + "</strong> (in force) to <strong>" + (it.target || "?") +
+        "</strong>.";
+    } else if (it.kind === "enforcement") {
+      head = "<strong>Scenario:</strong> stronger enforcement of the <strong>" +
+        (it.in_force || "?") + "</strong> code already in force.";
+    } else {
+      head = "<strong>Scenario</strong>";
+    }
+    el.innerHTML = head +
+      (p != null ? " Practice factor " + p.toFixed(2) + "." : "") +
+      (dr != null ? " 2025–2075 at " + Math.round(100 * dr) + "% discount." : "") +
+      (it.note ? '<br><span class="note">' + it.note + "</span>" : "");
+  }
+
   function renderTiles(mp) {
     const m = mp.metrics;
     const ssp2 = mp.ssp_table.find((r) => r.ssp === "SSP2") || mp.ssp_table[0];
+    const bcrs = mp.ssp_table.map((r) => r.bcr).filter((v) => v != null);
+    const bcrRange = bcrs.length > 1
+      ? Math.min(...bcrs).toFixed(2) + "–" + Math.max(...bcrs).toFixed(2)
+      : null;
     const tiles = [
       [fmtUsd(m.baseline_aal_2025_usd) + "/yr", "Baseline AAL (2025)"],
       [(100 * m.aal_pct_gdp_2025).toFixed(1) + "%", "AAL as % of GDP"],
       [fmtInt.format(m.baseline_fatalities_2025_per_yr), "Expected fatalities /yr"],
-      [ssp2.bcr.toFixed(2), "BCR (SSP2)"],
+      [ssp2.bcr.toFixed(2) + (bcrRange ? ' <span style="font-size:0.65em;color:var(--muted)">' + bcrRange + "</span>" : ""),
+       "BCR — SSP2 · all-SSP range"],
       [ssp2.bcr_with_lives != null ? ssp2.bcr_with_lives.toFixed(2) : "—",
        "BCR incl. lives (side)"],
       [fmtInt.format(ssp2.lives_saved), "Lives saved to 2075"],
+      [ssp2.dalys_averted != null ? fmtInt.format(ssp2.dalys_averted) : "—",
+       "DALYs averted"],
       [fmtInt.format(ssp2.job_years), "Job-years preserved"],
       [ssp2.break_even_year || "—", "Break-even year"],
     ];
@@ -160,36 +190,54 @@
   }
 
   function renderChart(rows, mp) {
-    const ssp2 = rows.filter((r) => r.ssp === "SSP2");
-    if (!ssp2.length) return;
-    const years = ssp2.map((r) => r.year);
-    const ben = ssp2.map((r) => r.cum_disc_benefits);
-    const cost = ssp2.map((r) => r.cum_disc_costs);
-    const W = 420, H = 180, PAD = { l: 46, r: 8, t: 8, b: 22 };
+    const ssps = [...new Set(rows.map((r) => r.ssp))].sort();
+    if (!ssps.length) return;
+    const bySsp = Object.fromEntries(ssps.map((s) => [s, rows.filter((r) => r.ssp === s)]));
+    const base = bySsp["SSP2"] || bySsp[ssps[0]];
+    const years = base.map((r) => r.year);
+    const cost = base.map((r) => r.cum_disc_costs);
+    const allBen = ssps.map((s) => bySsp[s].map((r) => r.cum_disc_benefits));
+    const W = 420, H = 190, PAD = { l: 46, r: 8, t: 8, b: 22 };
     const xmin = Math.min(...years), xmax = Math.max(...years);
-    const ymax = Math.max(...ben, ...cost) || 1;
+    const ymax = Math.max(...cost, ...allBen.flat()) || 1;
     const X = (x) => PAD.l + ((x - xmin) / (xmax - xmin || 1)) * (W - PAD.l - PAD.r);
     const Y = (y) => H - PAD.b - (y / ymax) * (H - PAD.t - PAD.b);
     const path = (v) => v.map((y, i) => (i ? "L" : "M") + X(years[i]).toFixed(1) + "," + Y(y).toFixed(1)).join(" ");
-    const ticksY = [0, 0.5, 1].map((f) => f * ymax);
     let s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img">';
-    ticksY.forEach((t) => {
+    [0, 0.5, 1].forEach((f) => {
+      const t = f * ymax;
       s += '<line x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="#e1e0d9"/>' +
         '<text x="' + (PAD.l - 4) + '" y="' + (Y(t) + 3) + '" font-size="9" fill="#898781" text-anchor="end">' + fmtUsd(t) + "</text>";
     });
     [xmin, Math.round((xmin + xmax) / 2), xmax].forEach((t) => {
       s += '<text x="' + X(t) + '" y="' + (H - 6) + '" font-size="9" fill="#898781" text-anchor="middle">' + t + "</text>";
     });
+    // min-max benefits band across SSPs + thin lines, SSP2 bold
+    const bandTop = years.map((_, i) => Math.max(...allBen.map((v) => v[i])));
+    const bandBot = years.map((_, i) => Math.min(...allBen.map((v) => v[i])));
+    s += '<path d="' + path(bandTop) + " " +
+      bandBot.map((y, i) => "L" + X(years[bandBot.length - 1 - i]).toFixed(1) + "," +
+        Y(bandBot[bandBot.length - 1 - i]).toFixed(1)).join(" ") +
+      ' Z" fill="#1a9850" opacity="0.12" stroke="none"/>';
+    ssps.forEach((sp) => {
+      const bold = sp === "SSP2";
+      s += '<path d="' + path(bySsp[sp].map((r) => r.cum_disc_benefits)) +
+        '" fill="none" stroke="#1a9850" stroke-width="' + (bold ? 2.6 : 0.9) +
+        '" opacity="' + (bold ? 1 : 0.55) + '"/>';
+    });
     s += '<path d="' + path(cost) + '" fill="none" stroke="#c0392b" stroke-width="2" stroke-dasharray="5 3"/>';
-    s += '<path d="' + path(ben) + '" fill="none" stroke="#1a9850" stroke-width="2.4"/>';
-    s += '<text x="' + (W - PAD.r) + '" y="' + (Y(ben[ben.length - 1]) - 5) + '" font-size="10" fill="#1a9850" text-anchor="end">benefits</text>';
-    s += '<text x="' + (W - PAD.r) + '" y="' + (Y(cost[cost.length - 1]) - 5) + '" font-size="10" fill="#c0392b" text-anchor="end">costs</text>';
+    const benEnd = bySsp["SSP2"] ? bySsp["SSP2"].map((r) => r.cum_disc_benefits) : allBen[0];
+    s += '<text x="' + (W - PAD.r) + '" y="' + (Y(benEnd[benEnd.length - 1]) - 5) + '" font-size="10" fill="#1a9850" text-anchor="end">benefits (5 SSPs, SSP2 bold)</text>';
+    s += '<text x="' + (W - PAD.r) + '" y="' + (Y(cost[cost.length - 1]) - 5) + '" font-size="10" fill="#c0392b" text-anchor="end">costs (SSP2)</text>';
     s += "</svg>";
     document.getElementById("streams-chart").innerHTML = s;
-    const ssp2row = mp.ssp_table.find((r) => r.ssp === "SSP2");
+    const ssp2row = mp.ssp_table.find((r) => r.ssp === "SSP2") || mp.ssp_table[0];
+    const bcrs = mp.ssp_table.map((r) => r.bcr);
     document.getElementById("chart-note").textContent =
       "NPV benefits " + fmtUsd(ssp2row.npv_benefits_usd) + " vs costs " +
-      fmtUsd(ssp2row.npv_costs_usd) + " (5% discount rate). Lives saved are not monetised.";
+      fmtUsd(ssp2row.npv_costs_usd) + " (SSP2, 5% discount). BCR across SSPs: " +
+      Math.min(...bcrs).toFixed(2) + "–" + Math.max(...bcrs).toFixed(2) +
+      ". Lives saved are not monetised.";
   }
 
   const DIV_COLORS = { D1: "#1a9850", D2: "#2a78d6", D3: "#9467bd" };
@@ -223,9 +271,8 @@
     rows += '<tr><td><strong>Total dividends</strong></td><td class="num"><strong>' +
       fmtUsd(dv.total_npv) + "</strong></td></tr>" +
       '<tr><td>Program costs</td><td class="num">' + fmtUsd(dv.npv_costs) + "</td></tr>" +
-      '<tr><td>Triple-dividend ratio</td><td class="num"><strong>' +
-      (dv.ratio != null ? dv.ratio.toFixed(2) : "—") + "</strong> (headline BCR " +
-      dv.bcr_headline.toFixed(2) + ")</td></tr>";
+      '<tr><td>Benefit-cost ratio (the one BCR — same as chart &amp; map)</td>' +
+      '<td class="num"><strong>' + dv.bcr_headline.toFixed(2) + "</strong></td></tr>";
     const c = dv.counts || {};
     el.innerHTML =
       '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;margin-bottom:0.5rem">' +
@@ -243,10 +290,12 @@
     if (!rj) { tbl.innerHTML = "<tr><td>No retrofit data.</td></tr>"; return; }
     const idx = Object.fromEntries(rj.columns.map((c, i) => [c, i]));
     const rows = rj.rows.slice(0, 10);
+    const nameOf = (r) =>
+      idx["class_label"] != null && r[idx["class_label"]] ? r[idx["class_label"]] : r[idx["class"]];
     tbl.innerHTML =
-      "<tr><th>Class</th><th>Level</th><th class=num>Avoided AAL</th><th class=num>Lives/yr</th><th class=num>BCR</th></tr>" +
+      "<tr><th>Building class</th><th>Level</th><th class=num>Avoided AAL</th><th class=num>Lives/yr</th><th class=num>BCR</th></tr>" +
       rows.map((r) =>
-        "<tr><td class=tax>" + r[idx["class"]] + "</td><td>" + r[idx["current_level"]] +
+        '<tr><td title="' + r[idx["class"]] + '">' + nameOf(r) + "</td><td>" + r[idx["current_level"]] +
         '</td><td class=num>' + fmtUsd(r[idx["avoided_aal_usd"]]) + "/yr</td><td class=num>" +
         (+r[idx["avoided_fatalities_yr"]]).toFixed(1) + "</td><td class=num>" +
         (+r[idx["bcr_retrofit"]]).toFixed(2) + "</td></tr>").join("");
@@ -261,11 +310,12 @@
     state.iso = iso;
     setHash(state);
     const base = "data/countries/" + iso + "/";
-    const [mp, hex, streamsText, rj] = await Promise.all([
+    const [mp, hex, streamsText, rj, bnd] = await Promise.all([
       json(base + "metrics.json"),
       json(base + "hex.geojson"),
       fetch(base + "streams.csv").then((r) => (r.ok ? r.text() : "")),
       json(base + "retrofit.json").catch(() => null),
+      json(base + "boundaries.geojson").catch(() => null),
     ]);
     country = { metrics_payload: mp };
     hexData = hex;
@@ -279,12 +329,25 @@
       map.addLayer({ id: "hex-line", type: "line", source: "hex",
                      paint: { "line-color": "#555", "line-width": 0.3, "line-opacity": 0.4 } });
     }
+    const emptyFc = { type: "FeatureCollection", features: [] };
+    if (map.getSource("bnd")) {
+      map.getSource("bnd").setData(bnd || emptyFc);
+    } else {
+      map.addSource("bnd", { type: "geojson", data: bnd || emptyFc });
+      map.addLayer({ id: "adm1-line", type: "line", source: "bnd",
+                     filter: ["==", ["get", "level"], 1],
+                     paint: { "line-color": "#666", "line-width": 0.8, "line-opacity": 0.8 } });
+      map.addLayer({ id: "adm0-line", type: "line", source: "bnd",
+                     filter: ["==", ["get", "level"], 0],
+                     paint: { "line-color": "#333", "line-width": 1.8 } });
+    }
     styleHexLayer();
     const e = index.find((c) => c.iso3 === iso);
     if (e && e.bounds) {
       map.fitBounds([[e.bounds[0], e.bounds[1]], [e.bounds[2], e.bounds[3]]],
                     { padding: 30, duration: 600 });
     }
+    renderScenario(mp);
     renderTiles(mp);
     if (streamsText) renderChart(parseCsv(streamsText), mp);
     renderDividends(mp.dividends);
