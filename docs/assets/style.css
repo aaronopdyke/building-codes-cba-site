@@ -70,6 +70,110 @@ a:hover { text-decoration: underline; }
 .content p.lede { color: var(--ink-2); max-width: 75ch; }
 .content .note, .note { color: var(--muted); font-size: 0.85rem; }
 
+/* ---- landing page ---- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  background: #10233c;
+  color: #fff;
+  min-height: 340px;
+  display: flex;
+  align-items: center;
+}
+#hexfield {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hx {
+  fill: #1b3a5e;
+  stroke: #10233c;
+  stroke-width: 2;
+  animation: hxpulse 6s ease-out infinite;
+}
+@keyframes hxpulse {
+  0%   { fill: #1b3a5e; }
+  6%   { fill: #e8a33d; }
+  14%  { fill: #b03030; }
+  30%  { fill: #24507f; }
+  100% { fill: #1b3a5e; }
+}
+.ripple {
+  fill: none;
+  stroke: #ffd27a;
+  stroke-width: 2.5;
+  opacity: 0;
+  animation: ripple 4.2s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ripple {
+  0%   { opacity: 0.9; transform: scale(1); }
+  70%  { opacity: 0;   transform: scale(28); }
+  100% { opacity: 0;   transform: scale(28); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx { animation: none; }
+  .ripple { display: none; }
+}
+.hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2.6rem 1.25rem;
+}
+.hero-inner h1 { font-size: 2rem; margin: 0 0 0.4rem; text-shadow: 0 1px 8px rgba(0,0,0,0.45); }
+.hero-inner .tagline {
+  max-width: 46rem;
+  color: #d9e4f2;
+  font-size: 1.02rem;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.hero-cta { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-top: 1.1rem; align-items: center; }
+.hero-cta select { min-width: 240px; padding: 0.5rem 0.6rem; }
+.cta-btn {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff !important;
+  font-weight: 650;
+  padding: 0.5rem 1.1rem;
+  border-radius: 6px;
+  text-decoration: none !important;
+}
+.cta-btn:hover { background: var(--accent-dark); }
+
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.8rem;
+}
+.method-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+}
+.method-card h3 { margin: 0.3rem 0 0.4rem; font-size: 0.98rem; }
+.method-card p { margin: 0; font-size: 0.85rem; color: var(--ink-2); }
+.m-num {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-weight: 650; font-size: 0.85rem;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* compliance panel */
+.score-bar { position: relative; height: 14px; background: var(--hairline); border-radius: 7px; margin: 0.3rem 0 0.5rem; }
+.score-bar .fill { position: absolute; inset: 0 auto 0 0; border-radius: 7px; background: linear-gradient(90deg, #d73027, #fdae61, #7fbc41); }
+.score-bar .tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.pkg-list { margin: 0.4rem 0 0; padding: 0; list-style: none; font-size: 0.8rem; }
+.pkg-list li { margin: 0.2rem 0; }
+.pkg-ok { color: #2e7d32; }
+.pkg-gap { color: #b03030; }
+
 /* ---- explorer layout ---- */
 .map-page { min-height: 100vh; display: flex; flex-direction: column; }
 .map-page main { flex: 1; min-height: 0; }
@@ -204,6 +308,28 @@ select {
 }
 .panel h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
 #streams-chart svg { width: 100%; height: auto; display: block; }
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+  font-size: 0.74rem;
+}
+.chart-controls .segmented button { padding: 0.15rem 0.5rem; font-size: 0.74rem; }
+.chart-ctl { display: inline-flex; align-items: center; gap: 0.3rem; }
+.chart-ctl label { color: var(--muted); }
+
+/* sortable ADM1 ranking table */
+#adm1-table th.sortable { cursor: pointer; user-select: none; }
+#adm1-table th.sortable:hover { color: var(--ink); }
+#adm1-table th .arrow { font-size: 0.65rem; color: var(--accent-dark); }
+#adm1-table td.rank { color: var(--muted); text-align: right; }
+
+/* BCR tile: small per-SSP row + uncertainty subtext */
+.tile .sub { font-size: 0.66rem; color: var(--muted); line-height: 1.35; }
+.tile .sub b { color: var(--ink-2); font-weight: 600; }
 
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 0.78rem; }

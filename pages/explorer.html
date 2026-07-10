@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building Codes CBA — Seismic Cost-Benefit Explorer</title>
+<meta name="description" content="Demo explorer of seismic building-code cost-benefit results: hex-tile maps of benefit-cost ratios and average annual losses, SSP scenario fans, and retrofit priorities.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%9A%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.min.css">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="map-page">
+<header class="site-header">
+  <div class="brand">Building Codes CBA <span>· seismic cost-benefit demo</span></div>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="explorer.html" class="active">Explorer</a>
+    <a href="about.html">About</a>
+  </nav>
+</header>
+
+<div class="banner">Illustrative demo — modelled aggregates only; not for decision use without review.</div>
+
+<div class="controls">
+  <div class="control-group">
+    <label for="country-select">Country</label>
+    <select id="country-select"></select>
+  </div>
+  <div class="control-group">
+    <label for="horizon-select" title="How far into the future benefits and costs are counted">Horizon</label>
+    <select id="horizon-select">
+      <option value="25">25 years (2050)</option>
+      <option value="50" selected>50 years (2075)</option>
+      <option value="75">75 years (2100)</option>
+    </select>
+  </div>
+  <div class="control-group" role="group" aria-label="Map view">
+    <label>Map</label>
+    <div class="segmented" id="view-toggle">
+      <button type="button" data-view="hazard" aria-pressed="false">Seismic&nbsp;hazard</button>
+      <button type="button" data-view="exposure" aria-pressed="false">Exposure&nbsp;2025</button>
+      <button type="button" data-view="growth" aria-pressed="false">Growth&nbsp;to&nbsp;2075</button>
+      <button type="button" data-view="risk" aria-pressed="true">Risk&nbsp;metrics</button>
+    </div>
+  </div>
+  <div class="control-group" role="group" aria-label="Risk metric" id="metric-group">
+    <label>Metric</label>
+    <div class="segmented" id="metric-toggle">
+      <button type="button" data-metric="bcr" aria-pressed="true">BCR</button>
+      <button type="button" data-metric="npv_benefits" aria-pressed="false">Total&nbsp;benefits</button>
+      <button type="button" data-metric="aal_2025" aria-pressed="false">Annual&nbsp;loss</button>
+      <button type="button" data-metric="aal_ratio" aria-pressed="false" title="Average annual earthquake loss as a share of building value">Loss&nbsp;rate</button>
+    </div>
+  </div>
+  <div class="legend" id="legend" aria-label="Map legend"></div>
+</div>
+
+<main>
+  <div class="layout">
+    <div class="map-wrap">
+      <div id="map" aria-label="Hex-tile map of CBA results"></div>
+      <div class="map-tooltip" id="tooltip" role="status"></div>
+    </div>
+    <aside class="side">
+      <p class="scenario" id="scenario"></p>
+      <div class="tiles" id="tiles"></div>
+      <ul class="tile-context" id="tile-context"></ul>
+      <section class="panel">
+        <h3 id="chart-title">Cumulative discounted benefits vs costs</h3>
+        <div class="chart-controls">
+          <div class="segmented" id="chart-mode" role="group" aria-label="Chart mode">
+            <button type="button" data-mode="bc" aria-pressed="true">Benefits&nbsp;vs&nbsp;costs</button>
+            <button type="button" data-mode="bcr" aria-pressed="false">Cumulative&nbsp;BCR</button>
+          </div>
+          <span class="chart-ctl"><label>Discount</label>
+            <div class="segmented" id="disc-toggle" role="group" aria-label="Discount rate"></div>
+          </span>
+          <span class="chart-ctl"><label title="Construction-cost increase, % of structural cost">Premium</label>
+            <div class="segmented" id="prem-toggle" role="group" aria-label="Construction premium"></div>
+          </span>
+        </div>
+        <div id="streams-chart"></div>
+        <p class="note" id="chart-note"></p>
+      </section>
+      <section class="panel">
+        <h3>Triple dividend of resilience</h3>
+        <div id="dividends"></div>
+        <p class="note" id="dividends-note"></p>
+      </section>
+      <section class="panel">
+        <h3>Admin-1 ranking</h3>
+        <div class="table-wrap"><table id="adm1-table"></table></div>
+        <p class="note" id="adm1-note">Click a column header to sort. National program costs are
+          allocated to provinces by their share of new construction value.</p>
+      </section>
+      <section class="panel">
+        <h3>Regulatory profile &amp; compliance</h3>
+        <div id="compliance"></div>
+        <p class="note" id="compliance-note"></p>
+      </section>
+      <section class="panel">
+        <h3>Retrofit priorities — existing stock</h3>
+        <div class="table-wrap"><table id="retrofit-table"></table></div>
+        <p class="note" id="retrofit-note"></p>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<footer class="site-footer">
+  © CC BY-NC-SA 4.0 ·
+  Vulnerability: <a href="https://github.com/gem/global_vulnerability_model">GEM Global Vulnerability Model</a> (CC BY-NC-SA 4.0) ·
+  Costs: <a href="https://github.com/gem/global_exposure_model">GEM Global Exposure Model</a> ·
+  Hazard: GEM Global Seismic Hazard Map ·
+  <span data-meta-line></span> ·
+  <a href="about.html">Method &amp; caveats</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

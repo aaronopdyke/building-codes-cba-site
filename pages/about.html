@@ -11,7 +11,8 @@
 <header class="site-header">
   <div class="brand">Building Codes CBA <span>· seismic cost-benefit demo</span></div>
   <nav>
-    <a href="index.html">Explorer</a>
+    <a href="index.html">Home</a>
+    <a href="explorer.html">Explorer</a>
     <a href="about.html" class="active">About</a>
   </nav>
 </header>
@@ -22,19 +23,23 @@
   enforcement. For each country it models today's building stock on a 1&nbsp;km grid
   (floor areas &times; unit construction costs &times; GEM building typologies &times;
   construction-vintage code levels), pairs it with GEM vulnerability functions and the
-  GEM seismic hazard map, and runs a 2025&ndash;2075 cost-benefit analysis of raising new
-  construction to the next code level &mdash; across all five SSP growth scenarios.</p>
+  GEM seismic hazard map, and runs a cost-benefit analysis of raising new construction
+  to the next code level &mdash; across all five SSP growth scenarios, over a
+  25-, 50- or 75-year horizon (2050 / 2075 / 2100; 50 years is the default
+  everywhere).</p>
 
   <h2>What the map shows</h2>
   <p>Everything is aggregated onto H3 hexagons (size auto-scaled to the country;
   roughly 36&ndash;253&nbsp;km&sup2; per hex). Values are summed per hex and ratios derived
-  after aggregation. Map views:</p>
+  after aggregation. The mosaic covers the country's whole land area — hexes with
+  no modelled built-up area show as zero/no-data tiles rather than holes; ocean
+  and large lakes are excluded. Map views:</p>
   <ul>
     <li><strong>Seismic hazard</strong> — mean peak ground acceleration with a 475-year
       return period (GEM Global Seismic Hazard Map).</li>
     <li><strong>Exposure 2025</strong> — building replacement value per hex.</li>
-    <li><strong>Growth to 2075</strong> — new floor area added between 2025 and 2075
-      (SSP2 forecast).</li>
+    <li><strong>Growth</strong> — new floor area added between 2025 and the selected
+      horizon (SSP2 forecast).</li>
     <li><strong>Risk metrics</strong>:
       <ul>
         <li><strong>BCR</strong> — total benefits of all three resilience dividends
@@ -74,19 +79,71 @@
   </ul>
   <p class="note">There is exactly <strong>one benefit-cost ratio</strong> on this
   site: total benefits of all three dividends ÷ costs, identical in the summary
-  tiles, the cumulative chart, and every hex cell on the map. DALYs are estimated
-  from fatalities (GEM publishes no injury functions): deaths × years of life lost
-  (WB life expectancy) plus an injury ratio — parameters stated in the notebook
-  outputs. Context statistics cite EM-DAT (CRED/UCLouvain), Disease Control
-  Priorities 3rd ed. (2018), and World Bank labour-force data.</p>
+  tiles, the cumulative chart, and every hex cell on the map (at the selected
+  horizon). Investment costs are broken down into government policy development
+  (upfront), government enforcement &amp; permitting (ongoing), and the public's
+  higher construction costs (the premium). DALYs are estimated from fatalities
+  (GEM publishes no injury functions): deaths × years of life lost (WB life
+  expectancy) plus an injury ratio — parameters stated in the notebook outputs.
+  Context statistics cite EM-DAT (CRED/UCLouvain), World Bank life expectancy
+  (for the DALY comparison) and an assumed 40-year working career (for the jobs
+  comparison — the World Bank publishes no expected-working-life indicator).</p>
+
+  <h2>Scenario toggles on the chart</h2>
+  <p class="note">The chart's discount-rate and construction-premium toggles
+  recompute costs and benefits client-side from the exported undiscounted flows —
+  both are linear, so the recombination is exact. The summary tiles, dividends
+  panel and map keep the headline assumptions (5% discount, the country's default
+  premium). Building-practice-factor sensitivity is <em>not</em> client-computable
+  (it acts nonlinearly through the vulnerability-curve mixing) and lives in the
+  notebook instead.</p>
+
+  <h2>Regulatory profile &amp; compliance (Building Regulations Atlas)</h2>
+  <p>Each country page links to the
+  <a href="https://www.gfdrr.org/en/building-regulations-atlas">GFDRR Building
+  Regulations Atlas</a> and uses its indicators in two scoped ways:</p>
+  <ul>
+    <li><strong>Structural-design packages</strong> — only the Atlas's
+      <em>Building Design → Structural Resilience</em> indicators. Evaluating
+      individual code provisions is beyond this analysis; instead they are
+      grouped into the same code-level ladder the vulnerability model uses,
+      consistent with Crowley et&nbsp;al. (2021), where levels reflect the
+      sophistication of lateral-force design requirements: basic seismic
+      coefficients (low), dynamic analysis + site effects + drift control
+      (moderate), capacity design + ductile detailing (high). The suggested
+      package for a level jump is indicative — not exhaustive, items are not
+      individually costed, and not every item contributes quantified
+      benefits.</li>
+    <li><strong>Compliance score</strong> — all binary
+      <em>Compliance Mechanisms</em> indicators reduced to one factor per
+      country with a rank-1 alternating-least-squares factor model fitted on
+      observed entries only (a PCA analogue suited to binary items). This
+      handles the Atlas's uneven coverage — some indicators come from regional
+      reports (e.g. Sub-Saharan Africa) and simply don't exist for other
+      countries — because loadings are shared globally and each country is
+      scored from whatever subset it has. The score enters the building
+      practice factor as one weighted component (alongside governance,
+      education and corruption measures).</li>
+    <li><strong>Compliance-improvement packages</strong> — groups of
+      mechanisms (plan review, construction-phase inspections, professional
+      qualification, transparency/digital permitting). Closing a package's
+      gaps raises the compliance score, hence the practice factor, hence the
+      protection actually delivered. Benefits and premium costs both scale
+      roughly linearly with the practice factor, so packages raise total
+      protection while the BCR itself barely moves — impacts are shown as a
+      proportional benefit uplift, not an engine re-run.</li>
+  </ul>
 
   <h2>Retrofit priorities</h2>
   <p>Code changes only reach new construction. The retrofit table ranks the existing
   stock's building classes by avoided AAL if retrofitted: engineered classes move one
   code level up (GEM curves); non-engineered classes (adobe, unreinforced masonry,
-  timber) get a heuristic 35% damage reduction. Costs are a percentage of replacement
-  value by material (MUR 30%, CR 20%, W/S 15%, default 25%). These are screening
-  assumptions for TA targeting, not engineering estimates.</p>
+  timber) get a heuristic 35% damage reduction. Costs are a percentage of the
+  <em>structural</em> share of replacement value by material (MUR 30%, CR 20%, W/S
+  15%, default 25%), and benefits use the same triple-dividend accounting as the
+  headline BCR (avoided losses + avoided-reconstruction carbon, plus the stimulus
+  of the retrofit spend; no durability claim). These are screening assumptions for
+  TA targeting, not engineering estimates.</p>
 
   <h2>Key assumptions &amp; caveats</h2>
   <ul>
@@ -100,10 +157,13 @@
       employment units (avoided losses &divide; GDP per labor hour &divide; 2,000
       hours/yr) — they are never added to the BCR as dollars, which would double-count
       the same losses.</li>
-    <li>The construction premium is priced as a percentage of each location's unit
-      construction cost (default 3% for a one-level upgrade; sensitivity 1–12% in the
-      notebook) and applies to all complying new floor area regardless of local
-      hazard — country-wide BCRs are lower than hazard-targeted enforcement.</li>
+    <li>The construction premium is priced as a percentage of the
+      <strong>structural share</strong> of each location's unit construction cost
+      (roughly 30% of the building cost — a stated HAZUS-order assumption, as GEM's
+      structural-cost field is unpopulated; contents never bear a premium). Default
+      3% for a one-level upgrade; the chart's premium toggle spans 1–12%. The
+      premium applies to all complying new floor area regardless of local hazard —
+      country-wide BCRs are lower than hazard-targeted enforcement.</li>
     <li>Compliance is scaled by a building practice factor (WGI + subnational
       corruption + education, after Daniell et al. 2014).</li>
     <li>The existing stock's code-level mix blends GHSL built-up vintage (the
@@ -133,9 +193,8 @@
     <li><a href="https://github.com/gem/global_vulnerability_model">GEM Global
       Vulnerability Model</a> — CC BY-NC-SA 4.0.</li>
     <li><a href="https://github.com/gem/global_exposure_model">GEM Global Exposure
-      Model</a> (taxonomies, costs, contents, carbon accounting) via the
-      <a href="https://aaronopdyke.github.io/UCC-database/">UCC Database</a> —
-      CC BY-NC-SA 4.0.</li>
+      Model</a> (taxonomies, unit construction costs, contents, carbon accounting;
+      cost vintage ~2024 USD, used directly per admin-1) — CC BY-NC-SA 4.0.</li>
     <li>GEM Global Seismic Hazard Map (CC BY-NC-SA 4.0); GHSL built-up vintages
       (CC BY 4.0); World Bank Official Boundaries (CC BY 4.0); World Bank API
       indicators (CC BY 4.0); USGS ShakeMap (public domain).</li>

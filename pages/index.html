@@ -3,88 +3,151 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Building Codes CBA — Seismic Cost-Benefit Explorer</title>
-<meta name="description" content="Demo explorer of seismic building-code cost-benefit results: hex-tile maps of benefit-cost ratios and average annual losses, SSP scenario fans, and retrofit priorities.">
+<title>Building Codes CBA — do seismic building codes pay off?</title>
+<meta name="description" content="A cost-benefit explorer for seismic building-code adoption and enforcement: gridded exposure, GEM hazard and vulnerability, and the Triple Dividend of Resilience.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%9A%EF%B8%8F%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.min.css">
 <link rel="stylesheet" href="assets/style.css">
 </head>
-<body class="map-page">
+<body>
 <header class="site-header">
   <div class="brand">Building Codes CBA <span>· seismic cost-benefit demo</span></div>
   <nav>
-    <a href="index.html" class="active">Explorer</a>
+    <a href="index.html" class="active">Home</a>
+    <a href="explorer.html">Explorer</a>
     <a href="about.html">About</a>
   </nav>
 </header>
 
 <div class="banner">Illustrative demo — modelled aggregates only; not for decision use without review.</div>
 
-<div class="controls">
-  <div class="control-group">
-    <label for="country-select">Country</label>
-    <select id="country-select"></select>
-  </div>
-  <div class="control-group" role="group" aria-label="Map view">
-    <label>Map</label>
-    <div class="segmented" id="view-toggle">
-      <button type="button" data-view="hazard" aria-pressed="false">Seismic&nbsp;hazard</button>
-      <button type="button" data-view="exposure" aria-pressed="false">Exposure&nbsp;2025</button>
-      <button type="button" data-view="growth" aria-pressed="false">Growth&nbsp;to&nbsp;2075</button>
-      <button type="button" data-view="risk" aria-pressed="true">Risk&nbsp;metrics</button>
+<section class="hero">
+  <svg id="hexfield" aria-hidden="true"></svg>
+  <div class="hero-inner">
+    <h1>Do seismic building codes pay off?</h1>
+    <p class="tagline">A gridded cost-benefit explorer for adopting and enforcing
+    stronger building codes — avoided losses, lives, jobs and growth, on one map.</p>
+    <div class="hero-cta">
+      <select id="landing-country" aria-label="Choose a country">
+        <option value="">Choose a country…</option>
+      </select>
+      <a id="landing-go" class="cta-btn" href="explorer.html">Open the explorer →</a>
     </div>
   </div>
-  <div class="control-group" role="group" aria-label="Risk metric" id="metric-group">
-    <label>Metric</label>
-    <div class="segmented" id="metric-toggle">
-      <button type="button" data-metric="bcr" aria-pressed="true">BCR</button>
-      <button type="button" data-metric="npv_benefits" aria-pressed="false">Total&nbsp;benefits</button>
-      <button type="button" data-metric="aal_2025" aria-pressed="false">Annual&nbsp;loss</button>
-      <button type="button" data-metric="aal_ratio" aria-pressed="false" title="Average annual earthquake loss as a share of building value">Loss&nbsp;rate</button>
-    </div>
-  </div>
-  <div class="legend" id="legend" aria-label="Map legend"></div>
-</div>
+</section>
 
-<main>
-  <div class="layout">
-    <div class="map-wrap">
-      <div id="map" aria-label="Hex-tile map of CBA results"></div>
-      <div class="map-tooltip" id="tooltip" role="status"></div>
+<div class="content">
+  <h2>How the tool works</h2>
+  <div class="method-grid">
+    <div class="method-card">
+      <div class="m-num">1</div>
+      <h3>Model today's buildings</h3>
+      <p>Floor areas and building counts on a 1&nbsp;km grid, valued with GEM's
+      unit construction costs and typology mix per admin-1. The existing stock's
+      seismic code levels blend GHSL construction vintages with GEM's
+      performance-based shares (Crowley et&nbsp;al. 2021 ladder: none → low →
+      moderate → high code).</p>
     </div>
-    <aside class="side">
-      <p class="scenario" id="scenario"></p>
-      <div class="tiles" id="tiles"></div>
-      <ul class="tile-context" id="tile-context"></ul>
-      <section class="panel">
-        <h3>Cumulative discounted benefits vs costs (SSP2)</h3>
-        <div id="streams-chart"></div>
-        <p class="note" id="chart-note"></p>
-      </section>
-      <section class="panel">
-        <h3>Triple dividend of resilience</h3>
-        <div id="dividends"></div>
-        <p class="note" id="dividends-note"></p>
-      </section>
-      <section class="panel">
-        <h3>Retrofit priorities — existing stock</h3>
-        <div class="table-wrap"><table id="retrofit-table"></table></div>
-        <p class="note" id="retrofit-note"></p>
-      </section>
-    </aside>
+    <div class="method-card">
+      <div class="m-num">2</div>
+      <h3>Shake them</h3>
+      <p>The GEM Global Seismic Hazard Map (PGA, 5 return periods) meets GEM
+      vulnerability functions per building class — giving average annual losses
+      and expected fatalities for the stock as it is, and as it would be under a
+      stronger code, compliance scaled by a building practice factor.</p>
+    </div>
+    <div class="method-card">
+      <div class="m-num">3</div>
+      <h3>Grow the stock</h3>
+      <p>New construction follows all five SSP growth scenarios to 2100; the
+      existing stock turns over gradually. Only new (and rebuilt) floor area
+      pays the code premium — priced on the structural share of construction
+      cost — and only it earns the stronger code's protection.</p>
+    </div>
+    <div class="method-card">
+      <div class="m-num">4</div>
+      <h3>Count all three dividends</h3>
+      <p>One benefit-cost ratio counts the
+      <em>Triple Dividend of Resilience</em>: avoided losses (plus avoided
+      reconstruction carbon), unlocked economic potential (investment stimulus,
+      jobs), and co-benefits (durability). Lives and healthy life-years are
+      counted, never monetised. Choose a 25-, 50- or 75-year horizon.</p>
+    </div>
   </div>
-</main>
+
+  <p class="note" style="margin-top:1rem">Sources: GEM hazard, exposure,
+  vulnerability and carbon accounting (CC BY-NC-SA 4.0) · GHSL built-up vintages ·
+  World Bank boundaries and indicators · GFDRR Building Regulations Atlas.
+  Full method &amp; caveats on the <a href="about.html">About page</a>.</p>
+</div>
 
 <footer class="site-footer">
   © CC BY-NC-SA 4.0 ·
-  Vulnerability: <a href="https://github.com/gem/global_vulnerability_model">GEM Global Vulnerability Model</a> (CC BY-NC-SA 4.0) ·
-  Costs: <a href="https://aaronopdyke.github.io/UCC-database/">UCC Database</a> ·
+  Vulnerability: <a href="https://github.com/gem/global_vulnerability_model">GEM Global Vulnerability Model</a> ·
+  Costs: <a href="https://github.com/gem/global_exposure_model">GEM Global Exposure Model</a> ·
   Hazard: GEM Global Seismic Hazard Map ·
   <span data-meta-line></span> ·
   <a href="about.html">Method &amp; caveats</a>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.min.js"></script>
-<script src="assets/app.js"></script>
+<script>
+(function () {
+  "use strict";
+  /* animated hero: a hex mosaic with a seismic pulse sweeping outward */
+  var svg = document.getElementById("hexfield");
+  var W = 1200, H = 420, R = 26;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  var dx = R * 1.732, dy = R * 1.5;
+  var cx0 = W * 0.72, cy0 = H * 0.45;   /* epicentre */
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var pts = [];
+  for (var a = 0; a < 6; a++) pts.push([R * Math.sin(a * Math.PI / 3), R * Math.cos(a * Math.PI / 3)]);
+  var hexPath = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(2) + "," + p[1].toFixed(2); }).join(" ") + " Z";
+  var maxD = Math.hypot(W, H) * 0.75;
+  var html = "";
+  for (var row = 0; row * dy < H + R; row++) {
+    for (var col = 0; col * dx < W + R; col++) {
+      var x = col * dx + (row % 2 ? dx / 2 : 0), y = row * dy;
+      var d = Math.hypot(x - cx0, y - cy0);
+      var delay = (d / maxD * 3.2).toFixed(2);
+      html += '<path d="' + hexPath + '" transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ')"' +
+        ' class="hx"' + (reduce ? "" : ' style="animation-delay:' + delay + 's"') + "/>";
+    }
+  }
+  /* expanding ripples from the epicentre */
+  if (!reduce) {
+    for (var k = 0; k < 3; k++) {
+      html += '<circle class="ripple" cx="' + cx0 + '" cy="' + cy0 + '" r="10"' +
+        ' style="animation-delay:' + (k * 1.4).toFixed(1) + 's"/>';
+    }
+  }
+  svg.innerHTML = html;
+
+  /* country dropdown -> explorer deep link */
+  var sel = document.getElementById("landing-country");
+  var go = document.getElementById("landing-go");
+  fetch("data/countries_index.json").then(function (r) { return r.json(); })
+    .then(function (index) {
+      index.forEach(function (c) {
+        var o = document.createElement("option");
+        o.value = c.iso3;
+        o.textContent = c.name + "  (BCR " + (c.bcr_ssp2 != null ? c.bcr_ssp2.toFixed(1) : "–") + ")";
+        sel.appendChild(o);
+      });
+    }).catch(function () {});
+  function updateLink() {
+    go.href = sel.value ? "explorer.html#iso=" + sel.value : "explorer.html";
+  }
+  sel.addEventListener("change", updateLink);
+  updateLink();
+
+  /* footer meta line */
+  fetch("data/meta.json").then(function (r) { return r.json(); }).then(function (meta) {
+    document.querySelectorAll("[data-meta-line]").forEach(function (el) {
+      el.textContent = "Generated " + (meta.generated || "") +
+        " · discount rate " + Math.round(100 * (meta.discount_rate || 0.05)) + "%";
+    });
+  }).catch(function () {});
+})();
+</script>
 </body>
 </html>
