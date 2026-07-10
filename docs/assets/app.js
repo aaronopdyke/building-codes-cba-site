@@ -1,6 +1,6 @@
-/* Building Codes CBA — explorer. Hex-tile map (per-country GeoJSON with baked
-   quantile bins), summary tiles, SSP2 cumulative benefit/cost SVG chart,
-   retrofit table. Pattern: UCC Database site. */
+/* Building Codes CBA — explorer. Map views (hazard / exposure / growth / risk
+   metrics) on hex tiles with baked bins, plain-language scenario, icon tiles
+   with relatable context stats, SSP fans, dividends and retrofit panels. */
 
 (function () {
   "use strict";
@@ -14,21 +14,65 @@
     if (a >= 1e3) return "$" + (v / 1e3).toFixed(0) + "k";
     return "$" + v.toFixed(0);
   };
-  const fmtMetric = {
-    bcr: (v) => (v == null ? "–" : v.toFixed(2)),
-    npv_benefits: fmtUsd,
-    aal_2025: (v) => fmtUsd(v) + "/yr",
-    aal_ratio: (v) => (v == null ? "–" : (100 * v).toFixed(2) + "%"),
+  const fmtArea = (v) => {
+    if (v == null || !isFinite(v)) return "–";
+    const a = Math.abs(v);
+    if (a >= 1e6) return (v / 1e6).toFixed(1) + " km²";
+    if (a >= 1e3) return (v / 1e3).toFixed(0) + "k m²";
+    return v.toFixed(0) + " m²";
   };
-  const METRIC_LABEL = {
-    bcr: "Benefit-cost ratio (SSP2)",
-    npv_benefits: "NPV avoided losses (SSP2)",
-    aal_2025: "Baseline AAL 2025 (USD/yr)",
-    aal_ratio: "AAL / replacement value",
+
+  // plain-language names for the GEM code levels (per-audience request)
+  const CD_PLAIN = {
+    CDN: "no seismic code",
+    CDL: "a basic seismic code",
+    CDM: "a moderate seismic code",
+    CDH: "a modern, high-standard seismic code",
   };
+
   const RAMP_SEQ = ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"];
   const RAMP_DIV = ["#d73027", "#f46d43", "#fdae61", "#fee08b", "#d9ef8b", "#66bd63", "#1a9850"];
+  const RAMP_HAZ = ["#dbeff9", "#8fb3ff", "#abcf63", "#fffa14", "#ffd121", "#ffa30a", "#ff4c00"];
+  const RAMP_BLUE = ["#f0f7fb", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#17406d"];
   const NODATA = "#e1e0d9";
+
+  // risk metrics (the "Risk metrics" view)
+  const METRICS = {
+    bcr: { label: "Benefit-cost ratio (all 3 dividends, SSP2)",
+           short: "BCR", ramp: RAMP_DIV, fmt: (v) => (v == null ? "–" : v.toFixed(2)) },
+    npv_benefits: { label: "Total benefits — all 3 dividends (NPV, SSP2)",
+                    short: "Benefits", ramp: RAMP_SEQ, fmt: fmtUsd },
+    aal_2025: { label: "Average annual earthquake loss, 2025 (USD/yr)",
+                short: "Annual loss", ramp: RAMP_SEQ, fmt: (v) => fmtUsd(v) + "/yr" },
+    aal_ratio: { label: "Average annual earthquake loss as a share of building value",
+                 short: "Loss rate", ramp: RAMP_SEQ,
+                 fmt: (v) => (v == null ? "–" : (100 * v).toFixed(2) + "% of value/yr") },
+  };
+
+  // top-level map views
+  const VIEWS = {
+    hazard: { key: "pga_475", label: "Seismic hazard — peak ground acceleration, 475-yr return period (g)",
+              ramp: RAMP_HAZ, fmt: (v) => (v == null ? "–" : v.toFixed(2) + " g") },
+    exposure: { key: "repl_value", label: "Exposure 2025 — building replacement value per hex (USD)",
+                ramp: RAMP_BLUE, fmt: fmtUsd },
+    growth: { key: "fa_growth", label: "New floor area added 2025→2075 (m², SSP2)",
+              ramp: RAMP_BLUE, fmt: fmtArea },
+    risk: null,   // uses METRICS
+  };
+
+  // small inline icons for the stat tiles (stroke = currentColor)
+  const I = (d) => '<svg class="ticon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + d + "</svg>";
+  const ICONS = {
+    aal: I('<path d="M3 21h18M5 21V10l4-3v14M9 21V7l6-4v18M15 21v-8l4-2v10"/>'),
+    gdp: I('<path d="M3 17l5-5 4 3 6-7"/><path d="M21 21H3V3"/>'),
+    fatalities: I('<path d="M12 3l9 16H3z"/><path d="M12 10v4m0 3h.01"/>'),
+    bcr: I('<path d="M12 3v18M7 7h10M5 7l-2 5a3 3 0 006 0zM19 7l-2 5a3 3 0 006 0z"/>'),
+    lives: I('<path d="M12 21s-7-4.6-9.3-9A5.4 5.4 0 0112 6a5.4 5.4 0 019.3 6c-2.3 4.4-9.3 9-9.3 9z"/>'),
+    dalys: I('<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'),
+    jobs: I('<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a2 2 0 012-2h2a2 2 0 012 2v2"/>'),
+    breakeven: I('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+  };
 
   async function json(url) {
     const r = await fetch(url);
@@ -44,8 +88,8 @@
     }
     return out;
   }
-  function setHash(state) {
-    location.hash = "iso=" + state.iso + "&metric=" + state.metric;
+  function setHash() {
+    location.hash = "iso=" + state.iso + "&view=" + state.view + "&metric=" + state.metric;
   }
 
   async function fillMetaLine() {
@@ -55,7 +99,7 @@
         el.textContent = "Generated " + (meta.generated || "") +
           " · discount rate " + Math.round(100 * (meta.discount_rate || 0.05)) + "%";
       });
-    } catch (e) { /* footer line is optional */ }
+    } catch (e) { /* optional */ }
   }
 
   if (document.currentScript && document.currentScript.dataset.page === "about") {
@@ -64,13 +108,14 @@
   }
 
   // ---------------- explorer ----------------
-  const state = { iso: null, metric: "bcr" };
+  const state = { iso: null, view: "risk", metric: "bcr" };
   const h = hashState();
-  if (h.metric && METRIC_LABEL[h.metric]) state.metric = h.metric;
+  if (h.view && VIEWS.hasOwnProperty(h.view)) state.view = h.view;
+  if (h.metric && METRICS[h.metric]) state.metric = h.metric;
 
   const tooltip = document.getElementById("tooltip");
   const select = document.getElementById("country-select");
-  let index = [], country = null, hexData = null;
+  let index = [], country = null;
 
   const map = new maplibregl.Map({
     container: "map",
@@ -94,62 +139,74 @@
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-  function ramp(metric) { return metric === "bcr" ? RAMP_DIV : RAMP_SEQ; }
-
-  function fillExpr(metric, bins) {
-    const colors = ramp(metric);
-    const edges = (bins && bins.length ? bins : [0]).slice(0, colors.length - 1);
-    const step = ["step", ["get", metric], colors[0]];
-    edges.forEach((e, i) => step.push(e, colors[Math.min(i + 1, colors.length - 1)]));
-    return ["case", ["==", ["typeof", ["get", metric]], "number"], step, NODATA];
+  function activeLayer() {
+    if (state.view === "risk") {
+      const m = METRICS[state.metric];
+      return { key: state.metric, label: m.label, ramp: m.ramp, fmt: m.fmt };
+    }
+    return VIEWS[state.view];
   }
 
-  function drawLegend(metric, bins) {
+  function fillExpr(key, ramp, bins) {
+    const edges = (bins && bins.length ? bins : [0]).slice(0, ramp.length - 1);
+    const step = ["step", ["get", key], ramp[0]];
+    edges.forEach((e, i) => step.push(e, ramp[Math.min(i + 1, ramp.length - 1)]));
+    return ["case", ["==", ["typeof", ["get", key]], "number"], step, NODATA];
+  }
+
+  function drawLegend(lay, bins) {
     const el = document.getElementById("legend");
-    const colors = ramp(metric);
-    const edges = (bins && bins.length ? bins : []).slice(0, colors.length - 1);
-    const fmt = fmtMetric[metric];
-    let htmlStr = "<strong>" + METRIC_LABEL[metric] + "</strong>";
+    const edges = (bins && bins.length ? bins : []).slice(0, lay.ramp.length - 1);
+    let htmlStr = "<strong>" + lay.label + "</strong>";
     for (let i = 0; i <= edges.length; i++) {
       let lbl;
       if (!edges.length) lbl = "";
-      else if (i === 0) lbl = "< " + fmt(edges[0]);
-      else if (i === edges.length) lbl = "≥ " + fmt(edges[edges.length - 1]);
-      else lbl = fmt(edges[i - 1]) + "–" + fmt(edges[i]);
+      else if (i === 0) lbl = "< " + lay.fmt(edges[0]);
+      else if (i === edges.length) lbl = "≥ " + lay.fmt(edges[edges.length - 1]);
+      else lbl = lay.fmt(edges[i - 1]) + "–" + lay.fmt(edges[i]);
       htmlStr += '<span><span class="swatch" style="background:' +
-        colors[Math.min(i, colors.length - 1)] + '"></span>' + lbl + "</span>";
+        lay.ramp[Math.min(i, lay.ramp.length - 1)] + '"></span>' + lbl + "</span>";
     }
     el.innerHTML = htmlStr;
   }
 
   function styleHexLayer() {
     if (!country || !map.getLayer("hex-fill")) return;
-    const bins = (country.metrics_payload.hex.bins || {})[state.metric] || [];
-    map.setPaintProperty("hex-fill", "fill-color", fillExpr(state.metric, bins));
-    drawLegend(state.metric, bins);
+    const lay = activeLayer();
+    const bins = (country.metrics_payload.hex.bins || {})[lay.key] || [];
+    map.setPaintProperty("hex-fill", "fill-color", fillExpr(lay.key, lay.ramp, bins));
+    drawLegend(lay, bins);
+    document.querySelectorAll("#metric-toggle button").forEach((b) =>
+      b.setAttribute("aria-pressed", String(state.view === "risk" && b.dataset.metric === state.metric)));
+    document.getElementById("metric-group").style.display =
+      state.view === "risk" ? "" : "none";
+    document.querySelectorAll("#view-toggle button").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.view === state.view)));
   }
 
   function renderScenario(mp) {
     const el = document.getElementById("scenario");
     if (!el) return;
     const it = (mp.metrics || {}).intervention || {};
-    const p = (mp.metrics || {}).practice_p_national;
     const dr = (mp.metrics || {}).discount_rate;
     let head;
     if (it.kind === "code_upgrade") {
-      head = "<strong>Scenario:</strong> new construction raised from <strong>" +
-        (it.in_force || "?") + "</strong> (in force) to <strong>" + (it.target || "?") +
-        "</strong>.";
+      const prem = it.premium_mode === "pct_of_ucc" && it.premium_pct
+        ? ", adding about " + (100 * it.premium_pct).toFixed(1) + "% to construction costs"
+        : "";
+      head = "<strong>Scenario:</strong> new buildings are designed to " +
+        (CD_PLAIN[it.target] || it.target) + " (" + it.target +
+        ") instead of today's " + (CD_PLAIN[it.in_force] || it.in_force) +
+        " (" + it.in_force + ")" + prem + ".";
     } else if (it.kind === "enforcement") {
-      head = "<strong>Scenario:</strong> stronger enforcement of the <strong>" +
-        (it.in_force || "?") + "</strong> code already in force.";
+      head = "<strong>Scenario:</strong> stronger enforcement of " +
+        (CD_PLAIN[it.in_force] || it.in_force) + " (" + it.in_force + ") already in force.";
     } else {
       head = "<strong>Scenario</strong>";
     }
     el.innerHTML = head +
-      (p != null ? " Practice factor " + p.toFixed(2) + "." : "") +
-      (dr != null ? " 2025–2075 at " + Math.round(100 * dr) + "% discount." : "") +
-      (it.note ? '<br><span class="note">' + it.note + "</span>" : "");
+      (dr != null ? " Benefits and costs 2025–2075, discounted at " +
+        Math.round(100 * dr) + "%." : "");
   }
 
   function renderTiles(mp) {
@@ -160,22 +217,49 @@
       ? Math.min(...bcrs).toFixed(2) + "–" + Math.max(...bcrs).toFixed(2)
       : null;
     const tiles = [
-      [fmtUsd(m.baseline_aal_2025_usd) + "/yr", "Baseline AAL (2025)"],
-      [(100 * m.aal_pct_gdp_2025).toFixed(1) + "%", "AAL as % of GDP"],
-      [fmtInt.format(m.baseline_fatalities_2025_per_yr), "Expected fatalities /yr"],
-      [ssp2.bcr.toFixed(2) + (bcrRange ? ' <span style="font-size:0.65em;color:var(--muted)">' + bcrRange + "</span>" : ""),
-       "BCR — SSP2 · all-SSP range"],
-      [ssp2.bcr_with_lives != null ? ssp2.bcr_with_lives.toFixed(2) : "—",
-       "BCR incl. lives (side)"],
-      [fmtInt.format(ssp2.lives_saved), "Lives saved to 2075"],
-      [ssp2.dalys_averted != null ? fmtInt.format(ssp2.dalys_averted) : "—",
-       "DALYs averted"],
-      [fmtInt.format(ssp2.job_years), "Job-years preserved"],
-      [ssp2.break_even_year || "—", "Break-even year"],
+      [ICONS.aal, fmtUsd(m.baseline_aal_2025_usd) + "/yr", "Average annual loss (2025)"],
+      [ICONS.gdp, (100 * m.aal_pct_gdp_2025).toFixed(1) + "%", "Annual loss as % of GDP"],
+      [ICONS.fatalities, fmtInt.format(m.baseline_fatalities_2025_per_yr), "Expected fatalities /yr"],
+      [ICONS.bcr, ssp2.bcr.toFixed(2) + (bcrRange ? ' <span style="font-size:0.65em;color:var(--muted)">' + bcrRange + "</span>" : ""),
+       "Benefit-cost ratio — SSP2 · range"],
+      [ICONS.lives, fmtInt.format(ssp2.lives_saved), "Lives saved to 2075"],
+      [ICONS.dalys, ssp2.dalys_averted != null ? fmtInt.format(ssp2.dalys_averted) : "–",
+       "Healthy life-years protected (DALYs)"],
+      [ICONS.jobs, fmtInt.format(ssp2.job_years), "Job-years preserved"],
+      [ICONS.breakeven, ssp2.break_even_year || "–", "Break-even year"],
     ];
     document.getElementById("tiles").innerHTML = tiles
-      .map(([v, k]) => '<div class="tile"><div class="v">' + v + '</div><div class="k">' + k + "</div></div>")
+      .map(([ic, v, k]) => '<div class="tile">' + ic +
+        '<div><div class="v">' + v + '</div><div class="k">' + k + "</div></div></div>")
       .join("");
+
+    // relatable context under the tiles
+    const ctx = mp.context || {};
+    const name = mp.name || mp.iso3;
+    const items = [];
+    if (ctx.emdat_deaths) {
+      items.push("<strong>Lives:</strong> for scale, " +
+        fmtInt.format(ctx.emdat_deaths) + " " +
+        (ctx.emdat_note || "earthquake deaths (EM-DAT)") + ".");
+    }
+    if (ssp2.dalys_averted) {
+      items.push("<strong>DALYs:</strong> a DALY is one lost year of healthy life. " +
+        "For scale, proven health programmes such as childhood immunisation or " +
+        "insecticide-treated bednets avert one DALY for roughly $25–100 " +
+        "(Disease Control Priorities, 3rd ed., 2018) — so " +
+        fmtInt.format(ssp2.dalys_averted) + " DALYs is the burden relieved by a " +
+        fmtUsd(ssp2.dalys_averted * 50) + " high-impact health programme.");
+    }
+    if (ctx.labor_force && ssp2.job_years) {
+      const pct = (100 * ssp2.job_years / 50 / ctx.labor_force);
+      items.push("<strong>Jobs:</strong> " + fmtInt.format(ssp2.job_years) +
+        " job-years over 50 years ≈ keeping " +
+        (pct < 0.1 ? pct.toFixed(2) : pct.toFixed(1)) + "% of " + name +
+        "'s labour force (" + fmtInt.format(ctx.labor_force) + " people, World Bank " +
+        (ctx.labor_force_year || "") + ") employed every year.");
+    }
+    document.getElementById("tile-context").innerHTML =
+      items.map((t) => "<li>" + t + "</li>").join("");
   }
 
   function parseCsv(text) {
@@ -212,7 +296,6 @@
     [xmin, Math.round((xmin + xmax) / 2), xmax].forEach((t) => {
       s += '<text x="' + X(t) + '" y="' + (H - 6) + '" font-size="9" fill="#898781" text-anchor="middle">' + t + "</text>";
     });
-    // min-max benefits band across SSPs + thin lines, SSP2 bold
     const bandTop = years.map((_, i) => Math.max(...allBen.map((v) => v[i])));
     const bandBot = years.map((_, i) => Math.min(...allBen.map((v) => v[i])));
     s += '<path d="' + path(bandTop) + " " +
@@ -226,18 +309,19 @@
         '" opacity="' + (bold ? 1 : 0.55) + '"/>';
     });
     s += '<path d="' + path(cost) + '" fill="none" stroke="#c0392b" stroke-width="2" stroke-dasharray="5 3"/>';
-    const benEnd = bySsp["SSP2"] ? bySsp["SSP2"].map((r) => r.cum_disc_benefits) : allBen[0];
-    s += '<text x="' + (W - PAD.r) + '" y="' + (Y(benEnd[benEnd.length - 1]) - 5) + '" font-size="10" fill="#1a9850" text-anchor="end">benefits (5 SSPs, SSP2 bold)</text>';
+    const benEnd = (bySsp["SSP2"] || bySsp[ssps[0]]).map((r) => r.cum_disc_benefits);
+    s += '<text x="' + (W - PAD.r) + '" y="' + (Y(benEnd[benEnd.length - 1]) - 5) + '" font-size="10" fill="#1a9850" text-anchor="end">benefits — all 3 dividends (SSP2 bold)</text>';
     s += '<text x="' + (W - PAD.r) + '" y="' + (Y(cost[cost.length - 1]) - 5) + '" font-size="10" fill="#c0392b" text-anchor="end">costs (SSP2)</text>';
     s += "</svg>";
     document.getElementById("streams-chart").innerHTML = s;
     const ssp2row = mp.ssp_table.find((r) => r.ssp === "SSP2") || mp.ssp_table[0];
     const bcrs = mp.ssp_table.map((r) => r.bcr);
     document.getElementById("chart-note").textContent =
-      "NPV benefits " + fmtUsd(ssp2row.npv_benefits_usd) + " vs costs " +
-      fmtUsd(ssp2row.npv_costs_usd) + " (SSP2, 5% discount). BCR across SSPs: " +
-      Math.min(...bcrs).toFixed(2) + "–" + Math.max(...bcrs).toFixed(2) +
-      ". Lives saved are not monetised.";
+      "Benefits sum all three resilience dividends (avoided losses + carbon, GDP stimulus, " +
+      "durability) — the same basis as the BCR tile and the map. NPV benefits " +
+      fmtUsd(ssp2row.npv_benefits_usd) + " vs costs " + fmtUsd(ssp2row.npv_costs_usd) +
+      " (SSP2). BCR across SSPs: " + Math.min(...bcrs).toFixed(2) + "–" +
+      Math.max(...bcrs).toFixed(2) + ". Lives and DALYs are never monetised.";
   }
 
   const DIV_COLORS = { D1: "#1a9850", D2: "#2a78d6", D3: "#9467bd" };
@@ -268,21 +352,22 @@
       rows += '<tr><td><span class="swatch" style="background:' + DIV_COLORS[d] +
         '"></span>' + DIV_LABELS[d] + '</td><td class="num">' + fmtUsd(v) + "</td></tr>";
     }
-    rows += '<tr><td><strong>Total dividends</strong></td><td class="num"><strong>' +
+    rows += '<tr><td><strong>Total benefits (= BCR numerator)</strong></td><td class="num"><strong>' +
       fmtUsd(dv.total_npv) + "</strong></td></tr>" +
       '<tr><td>Program costs</td><td class="num">' + fmtUsd(dv.npv_costs) + "</td></tr>" +
-      '<tr><td>Benefit-cost ratio (the one BCR — same as chart &amp; map)</td>' +
+      '<tr><td>Benefit-cost ratio (same everywhere on this page)</td>' +
       '<td class="num"><strong>' + dv.bcr_headline.toFixed(2) + "</strong></td></tr>";
     const c = dv.counts || {};
     el.innerHTML =
       '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;margin-bottom:0.5rem">' +
       bar + "</svg><table>" + rows + "</table>";
     note.innerHTML =
-      "Counts (not $): D1 lives saved " + fmtInt.format(c.lives_saved || 0) +
-      " · D2 job-years preserved " + fmtInt.format(c.job_years_preserved || 0) +
+      "Counts (not $): lives saved " + fmtInt.format(c.lives_saved || 0) +
+      " · DALYs " + fmtInt.format(c.dalys_averted || 0) +
+      " · job-years preserved " + fmtInt.format(c.job_years_preserved || 0) +
       " + created " + fmtInt.format(c.job_years_created || 0) + ". " +
       'Framework: <a href="' + dv.url + '">Triple Dividend of Resilience</a> ' +
-      "(Tanner et al., ODI/GFDRR/World Bank). " + dv.note;
+      "(Tanner et al., ODI/GFDRR/World Bank).";
   }
 
   function renderRetrofit(rj) {
@@ -308,7 +393,7 @@
 
   async function loadCountry(iso) {
     state.iso = iso;
-    setHash(state);
+    setHash();
     const base = "data/countries/" + iso + "/";
     const [mp, hex, streamsText, rj, bnd] = await Promise.all([
       json(base + "metrics.json"),
@@ -318,7 +403,6 @@
       json(base + "boundaries.geojson").catch(() => null),
     ]);
     country = { metrics_payload: mp };
-    hexData = hex;
 
     if (map.getSource("hex")) {
       map.getSource("hex").setData(hex);
@@ -358,13 +442,16 @@
     const f = ev.features && ev.features[0];
     if (!f) return;
     const p = f.properties;
+    const lay = activeLayer();
     tooltip.style.display = "block";
     tooltip.style.left = ev.point.x + 14 + "px";
     tooltip.style.top = ev.point.y + 14 + "px";
     tooltip.innerHTML =
-      "<strong>" + METRIC_LABEL[state.metric] + ": " + fmtMetric[state.metric](p[state.metric]) + "</strong><br>" +
-      "AAL " + fmtUsd(p.aal_2025) + "/yr · avoided " + fmtUsd(p.npv_benefits) +
-      "<br>replacement value " + fmtUsd(p.repl_value);
+      "<strong>" + lay.label + ": " + lay.fmt(p[lay.key]) + "</strong><br>" +
+      "hazard " + (p.pga_475 != null ? p.pga_475.toFixed(2) + " g" : "–") +
+      " · value " + fmtUsd(p.repl_value) +
+      "<br>annual loss " + fmtUsd(p.aal_2025) + "/yr · BCR " +
+      (p.bcr != null ? (+p.bcr).toFixed(2) : "–");
     map.getCanvas().style.cursor = "pointer";
   });
   map.on("mouseleave", "hex-fill", () => {
@@ -372,13 +459,19 @@
     map.getCanvas().style.cursor = "";
   });
 
+  document.getElementById("view-toggle").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-view]");
+    if (!btn) return;
+    state.view = btn.dataset.view;
+    setHash();
+    styleHexLayer();
+  });
   document.getElementById("metric-toggle").addEventListener("click", (ev) => {
     const btn = ev.target.closest("button[data-metric]");
     if (!btn) return;
+    state.view = "risk";
     state.metric = btn.dataset.metric;
-    document.querySelectorAll("#metric-toggle button").forEach((b) =>
-      b.setAttribute("aria-pressed", String(b === btn)));
-    setHash(state);
+    setHash();
     styleHexLayer();
   });
 
@@ -390,8 +483,6 @@
     select.innerHTML = index.map((c) =>
       '<option value="' + c.iso3 + '">' + c.name + "</option>").join("");
     const wanted = h.iso && index.some((c) => c.iso3 === h.iso) ? h.iso : (index[0] && index[0].iso3);
-    document.querySelectorAll("#metric-toggle button").forEach((b) =>
-      b.setAttribute("aria-pressed", String(b.dataset.metric === state.metric)));
     if (wanted) {
       select.value = wanted;
       map.on("load", () => loadCountry(wanted));

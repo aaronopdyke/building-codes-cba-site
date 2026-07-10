@@ -26,16 +26,28 @@
   construction to the next code level &mdash; across all five SSP growth scenarios.</p>
 
   <h2>What the map shows</h2>
-  <p>Final outputs aggregated onto H3 hexagons (size auto-scaled to the country;
+  <p>Everything is aggregated onto H3 hexagons (size auto-scaled to the country;
   roughly 36&ndash;253&nbsp;km&sup2; per hex). Values are summed per hex and ratios derived
-  after aggregation:</p>
+  after aggregation. Map views:</p>
   <ul>
-    <li><strong>BCR</strong> — discounted avoided losses &divide; discounted costs (SSP2).
-      National program costs (code development, enforcement, training) are allocated to
-      hexes by their share of discounted new-construction value.</li>
-    <li><strong>Avoided losses</strong> — NPV of avoided structural + contents losses (SSP2).</li>
-    <li><strong>AAL</strong> — baseline 2025 average annual loss (USD/yr).</li>
-    <li><strong>AAL / value</strong> — AAL as a share of replacement value.</li>
+    <li><strong>Seismic hazard</strong> — mean peak ground acceleration with a 475-year
+      return period (GEM Global Seismic Hazard Map).</li>
+    <li><strong>Exposure 2025</strong> — building replacement value per hex.</li>
+    <li><strong>Growth to 2075</strong> — new floor area added between 2025 and 2075
+      (SSP2 forecast).</li>
+    <li><strong>Risk metrics</strong>:
+      <ul>
+        <li><strong>BCR</strong> — total benefits of all three resilience dividends
+          &divide; discounted costs (SSP2) — the same ratio as the tiles and the chart.
+          National program costs (and their stimulus) are allocated to hexes by their
+          share of discounted new-construction value.</li>
+        <li><strong>Total benefits</strong> — NPV of all three dividends (SSP2).</li>
+        <li><strong>Annual loss</strong> — baseline 2025 average annual earthquake loss
+          (USD/yr).</li>
+        <li><strong>Loss rate</strong> — the average annual earthquake loss expressed as
+          a share of the building stock's replacement value (e.g. 0.2% means yearly
+          expected losses equal to 0.2% of what the buildings would cost to rebuild).</li>
+      </ul></li>
   </ul>
 
   <h2>Triple dividend of resilience</h2>
@@ -61,11 +73,12 @@
       50→60 years ≈ 0.33%/yr of compliant value).</li>
   </ul>
   <p class="note">There is exactly <strong>one benefit-cost ratio</strong> on this
-  site: the headline BCR (avoided direct losses ÷ costs), identical in the summary
-  tiles, the cumulative chart, and every hex cell on the map. Dividend totals are
-  context, never a second ratio. DALYs are estimated from fatalities (GEM publishes
-  no injury functions): deaths × years of life lost (WB life expectancy) plus an
-  injury ratio — parameters stated in the notebook outputs.</p>
+  site: total benefits of all three dividends ÷ costs, identical in the summary
+  tiles, the cumulative chart, and every hex cell on the map. DALYs are estimated
+  from fatalities (GEM publishes no injury functions): deaths × years of life lost
+  (WB life expectancy) plus an injury ratio — parameters stated in the notebook
+  outputs. Context statistics cite EM-DAT (CRED/UCLouvain), Disease Control
+  Priorities 3rd ed. (2018), and World Bank labour-force data.</p>
 
   <h2>Retrofit priorities</h2>
   <p>Code changes only reach new construction. The retrofit table ranks the existing
@@ -77,10 +90,12 @@
 
   <h2>Key assumptions &amp; caveats</h2>
   <ul>
-    <li>The headline BCR counts avoided structural + contents losses only.
-      <strong>Lives are valued only in the side metric "BCR incl. lives"</strong>
-      (VSL = 160 &times; GDP per capita, the World Bank reference case per Robinson
-      et al. 2019, +25% for nonfatal injuries) — never in the headline.</li>
+    <li>The single benefit-cost ratio counts <strong>all three resilience
+      dividends</strong>: avoided direct losses + avoided-reconstruction carbon (D1),
+      the GDP stimulus of the program's spending (D2 — note this is a multiplier on
+      the same spending that forms the cost side), and the durability of compliant
+      construction (D3). <strong>Lives and DALYs are never monetised</strong> — no
+      value is placed on life in this analysis; they are reported as counts.</li>
     <li><strong>Jobs preserved</strong> are the avoided losses re-expressed in
       employment units (avoided losses &divide; GDP per labor hour &divide; 2,000
       hours/yr) — they are never added to the BCR as dollars, which would double-count

@@ -171,9 +171,29 @@ select {
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   padding: 0.55rem 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
 }
-.tile .v { font-size: 1.25rem; font-weight: 650; }
-.tile .k { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.tile .v { font-size: 1.2rem; font-weight: 650; }
+.tile .k { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.tile .ticon {
+  width: 26px; height: 26px; flex: none;
+  color: var(--accent);
+}
+
+.tile-context {
+  list-style: none;
+  margin: 0 0 0.9rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+.tile-context li { margin: 0.25rem 0; }
+.tile-context li + li { border-top: 1px dashed var(--hairline); padding-top: 0.35rem; }
 
 .panel {
   background: var(--surface);

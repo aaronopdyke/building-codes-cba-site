@@ -25,13 +25,22 @@
     <label for="country-select">Country</label>
     <select id="country-select"></select>
   </div>
-  <div class="control-group" role="group" aria-label="Metric">
+  <div class="control-group" role="group" aria-label="Map view">
+    <label>Map</label>
+    <div class="segmented" id="view-toggle">
+      <button type="button" data-view="hazard" aria-pressed="false">Seismic&nbsp;hazard</button>
+      <button type="button" data-view="exposure" aria-pressed="false">Exposure&nbsp;2025</button>
+      <button type="button" data-view="growth" aria-pressed="false">Growth&nbsp;to&nbsp;2075</button>
+      <button type="button" data-view="risk" aria-pressed="true">Risk&nbsp;metrics</button>
+    </div>
+  </div>
+  <div class="control-group" role="group" aria-label="Risk metric" id="metric-group">
     <label>Metric</label>
     <div class="segmented" id="metric-toggle">
       <button type="button" data-metric="bcr" aria-pressed="true">BCR</button>
-      <button type="button" data-metric="npv_benefits" aria-pressed="false">Avoided&nbsp;losses</button>
-      <button type="button" data-metric="aal_2025" aria-pressed="false">AAL</button>
-      <button type="button" data-metric="aal_ratio" aria-pressed="false">AAL&nbsp;/&nbsp;value</button>
+      <button type="button" data-metric="npv_benefits" aria-pressed="false">Total&nbsp;benefits</button>
+      <button type="button" data-metric="aal_2025" aria-pressed="false">Annual&nbsp;loss</button>
+      <button type="button" data-metric="aal_ratio" aria-pressed="false" title="Average annual earthquake loss as a share of building value">Loss&nbsp;rate</button>
     </div>
   </div>
   <div class="legend" id="legend" aria-label="Map legend"></div>
@@ -46,6 +55,7 @@
     <aside class="side">
       <p class="scenario" id="scenario"></p>
       <div class="tiles" id="tiles"></div>
+      <ul class="tile-context" id="tile-context"></ul>
       <section class="panel">
         <h3>Cumulative discounted benefits vs costs (SSP2)</h3>
         <div id="streams-chart"></div>
