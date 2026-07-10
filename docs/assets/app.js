@@ -31,17 +31,35 @@
   };
 
   const RAMP_SEQ = ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"];
-  const RAMP_DIV = ["#d73027", "#f46d43", "#fdae61", "#fee08b", "#d9ef8b", "#66bd63", "#1a9850"];
-  const RAMP_HAZ = ["#dbeff9", "#8fb3ff", "#abcf63", "#fffa14", "#ffd121", "#ffa30a", "#ff4c00"];
+  const RAMP_GNBU = ["#f7fcf0", "#e0f3db", "#ccebc5", "#a8ddb5", "#7bccc4", "#4eb3d3", "#0868ac"];
   const RAMP_BLUE = ["#f0f7fb", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#17406d"];
+  const RAMP_PURP = ["#fcfbfd", "#efedf5", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3"];
+  const BCR_REDS = ["#a50026", "#d73027", "#f46d43", "#fdae61"];
+  const BCR_GREENS = ["#d9f0d3", "#a6dba0", "#7fbc41", "#4d9221", "#276419"];
   const NODATA = "#e1e0d9";
+
+  // BCR ramp adapts to the exported bins: classes below the 1.0 edge get red
+  // shades, classes at/above it get greens spread across the actual range
+  function bcrRamp(bins) {
+    const j = bins.findIndex((b) => Math.abs(b - 1.0) < 1e-9);
+    const nClasses = bins.length + 1;
+    if (j < 0) {   // no 1.0 edge: assume all >= 1 -> all greens
+      return Array.from({ length: nClasses }, (_, i) =>
+        BCR_GREENS[Math.round((i / Math.max(nClasses - 1, 1)) * (BCR_GREENS.length - 1))]);
+    }
+    const nRed = j + 1, nGreen = nClasses - nRed;
+    const reds = BCR_REDS.slice(-nRed);
+    const greens = Array.from({ length: nGreen }, (_, i) =>
+      BCR_GREENS[Math.round((i / Math.max(nGreen - 1, 1)) * (BCR_GREENS.length - 1))]);
+    return reds.concat(greens);
+  }
 
   // risk metrics (the "Risk metrics" view)
   const METRICS = {
-    bcr: { label: "Benefit-cost ratio (all 3 dividends, SSP2)",
-           short: "BCR", ramp: RAMP_DIV, fmt: (v) => (v == null ? "–" : v.toFixed(2)) },
+    bcr: { label: "Benefit-cost ratio (all 3 dividends, SSP2) — green ≥ 1",
+           short: "BCR", ramp: null /* dynamic */, fmt: (v) => (v == null ? "–" : v.toFixed(2)) },
     npv_benefits: { label: "Total benefits — all 3 dividends (NPV, SSP2)",
-                    short: "Benefits", ramp: RAMP_SEQ, fmt: fmtUsd },
+                    short: "Benefits", ramp: RAMP_GNBU, fmt: fmtUsd },
     aal_2025: { label: "Average annual earthquake loss, 2025 (USD/yr)",
                 short: "Annual loss", ramp: RAMP_SEQ, fmt: (v) => fmtUsd(v) + "/yr" },
     aal_ratio: { label: "Average annual earthquake loss as a share of building value",
@@ -49,14 +67,14 @@
                  fmt: (v) => (v == null ? "–" : (100 * v).toFixed(2) + "% of value/yr") },
   };
 
-  // top-level map views
+  // top-level map views (hazard renders as a continuous country-wide surface)
   const VIEWS = {
     hazard: { key: "pga_475", label: "Seismic hazard — peak ground acceleration, 475-yr return period (g)",
-              ramp: RAMP_HAZ, fmt: (v) => (v == null ? "–" : v.toFixed(2) + " g") },
+              ramp: null, fmt: (v) => (v == null ? "–" : v.toFixed(2) + " g"), image: true },
     exposure: { key: "repl_value", label: "Exposure 2025 — building replacement value per hex (USD)",
                 ramp: RAMP_BLUE, fmt: fmtUsd },
     growth: { key: "fa_growth", label: "New floor area added 2025→2075 (m², SSP2)",
-              ramp: RAMP_BLUE, fmt: fmtArea },
+              ramp: RAMP_PURP, fmt: fmtArea },
     risk: null,   // uses METRICS
   };
 
@@ -172,10 +190,26 @@
 
   function styleHexLayer() {
     if (!country || !map.getLayer("hex-fill")) return;
+    const mp = country.metrics_payload;
+    const isHaz = state.view === "hazard" && mp.hazard_image;
+    // hazard view swaps the hex mosaic for the continuous surface
+    ["hex-fill", "hex-line"].forEach((id) => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", isHaz ? "none" : "visible");
+    });
+    if (map.getLayer("haz-img")) {
+      map.setLayoutProperty("haz-img", "visibility", isHaz ? "visible" : "none");
+    }
     const lay = activeLayer();
-    const bins = (country.metrics_payload.hex.bins || {})[lay.key] || [];
-    map.setPaintProperty("hex-fill", "fill-color", fillExpr(lay.key, lay.ramp, bins));
-    drawLegend(lay, bins);
+    if (isHaz) {
+      const hz = mp.hazard_image;
+      drawLegend({ label: lay.label, ramp: hz.colors, fmt: lay.fmt },
+                 hz.bins.slice(0, hz.colors.length - 1));
+    } else {
+      const bins = (mp.hex.bins || {})[lay.key] || [];
+      const ramp = lay.ramp || (lay.key === "bcr" ? bcrRamp(bins) : RAMP_SEQ);
+      map.setPaintProperty("hex-fill", "fill-color", fillExpr(lay.key, ramp, bins));
+      drawLegend({ label: lay.label, ramp: ramp, fmt: lay.fmt }, bins);
+    }
     document.querySelectorAll("#metric-toggle button").forEach((b) =>
       b.setAttribute("aria-pressed", String(state.view === "risk" && b.dataset.metric === state.metric)));
     document.getElementById("metric-group").style.display =
@@ -226,7 +260,6 @@
       [ICONS.dalys, ssp2.dalys_averted != null ? fmtInt.format(ssp2.dalys_averted) : "–",
        "Healthy life-years protected (DALYs)"],
       [ICONS.jobs, fmtInt.format(ssp2.job_years), "Job-years preserved"],
-      [ICONS.breakeven, ssp2.break_even_year || "–", "Break-even year"],
     ];
     document.getElementById("tiles").innerHTML = tiles
       .map(([ic, v, k]) => '<div class="tile">' + ic +
@@ -424,6 +457,24 @@
       map.addLayer({ id: "adm0-line", type: "line", source: "bnd",
                      filter: ["==", ["get", "level"], 0],
                      paint: { "line-color": "#333", "line-width": 1.8 } });
+    }
+    // continuous hazard surface (image overlay; shown in the hazard view)
+    const hz = mp.hazard_image;
+    if (hz && hz.bounds) {
+      const [w, s, e, n] = hz.bounds;
+      const coords = [[w, n], [e, n], [e, s], [w, s]];
+      const url = base + hz.file;
+      if (map.getSource("hazimg")) {
+        map.getSource("hazimg").updateImage({ url: url, coordinates: coords });
+      } else {
+        map.addSource("hazimg", { type: "image", url: url, coordinates: coords });
+        map.addLayer({ id: "haz-img", type: "raster", source: "hazimg",
+                       layout: { visibility: "none" },
+                       paint: { "raster-opacity": 0.85, "raster-resampling": "linear" } },
+                     "adm1-line");
+      }
+    } else if (map.getLayer("haz-img")) {
+      map.setLayoutProperty("haz-img", "visibility", "none");
     }
     styleHexLayer();
     const e = index.find((c) => c.iso3 === iso);
