@@ -37,24 +37,26 @@
   const RAMP_GNBU = ["#f7fcf0", "#e0f3db", "#ccebc5", "#a8ddb5", "#7bccc4", "#4eb3d3", "#0868ac"];
   const RAMP_BLUE = ["#f0f7fb", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#17406d"];
   const RAMP_PURP = ["#fcfbfd", "#efedf5", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3"];
-  const BCR_REDS = ["#a50026", "#d73027", "#f46d43", "#fdae61"];
-  const BCR_GREENS = ["#d9f0d3", "#a6dba0", "#7fbc41", "#4d9221", "#276419"];
+  // ColorBrewer RdBu: colorblind-safe diverging ramp for the BCR (red keeps
+  // its "below 1" meaning; BLUES mean the program pays for itself)
+  const BCR_REDS = ["#67001f", "#b2182b", "#d6604d", "#f4a582"];
+  const BCR_BLUES = ["#d1e5f0", "#92c5de", "#4393c3", "#2166ac", "#053061"];
   const NODATA = "#e1e0d9";
 
   // BCR ramp adapts to the exported bins: classes below the 1.0 edge get red
-  // shades, classes at/above it get greens spread across the actual range
+  // shades, classes at/above it get blues spread across the actual range
   function bcrRamp(bins) {
     const j = bins.findIndex((b) => Math.abs(b - 1.0) < 1e-9);
     const nClasses = bins.length + 1;
-    if (j < 0) {   // no 1.0 edge: assume all >= 1 -> all greens
+    if (j < 0) {   // no 1.0 edge: assume all >= 1 -> all blues
       return Array.from({ length: nClasses }, (_, i) =>
-        BCR_GREENS[Math.round((i / Math.max(nClasses - 1, 1)) * (BCR_GREENS.length - 1))]);
+        BCR_BLUES[Math.round((i / Math.max(nClasses - 1, 1)) * (BCR_BLUES.length - 1))]);
     }
-    const nRed = j + 1, nGreen = nClasses - nRed;
+    const nRed = j + 1, nBlue = nClasses - nRed;
     const reds = BCR_REDS.slice(-nRed);
-    const greens = Array.from({ length: nGreen }, (_, i) =>
-      BCR_GREENS[Math.round((i / Math.max(nGreen - 1, 1)) * (BCR_GREENS.length - 1))]);
-    return reds.concat(greens);
+    const blues = Array.from({ length: nBlue }, (_, i) =>
+      BCR_BLUES[Math.round((i / Math.max(nBlue - 1, 1)) * (BCR_BLUES.length - 1))]);
+    return reds.concat(blues);
   }
 
   // metrics stored per horizon in the hex/adm1 payloads (suffixed _h25/_h50/_h75)
@@ -62,7 +64,7 @@
 
   // risk metrics (the "Risk metrics" view); labels get the horizon injected
   const METRICS = {
-    bcr: { label: (y) => "Benefit-cost ratio over " + y + " years (all 3 dividends, SSP2) — green ≥ 1",
+    bcr: { label: (y) => "Benefit-cost ratio over " + y + " years (all 3 dividends, SSP2) — blue ≥ 1",
            short: "BCR", ramp: null /* dynamic */, fmt: (v) => (v == null ? "–" : v.toFixed(2)) },
     npv_benefits: { label: (y) => "Total benefits over " + y + " years — all 3 dividends (NPV, SSP2)",
                     short: "Benefits", ramp: RAMP_GNBU, fmt: fmtUsd },
@@ -309,31 +311,11 @@
     const tbl = sspTable(mp);
     const ssp2 = tbl.find((r) => r.ssp === "SSP2") || tbl[0];
     if (!ssp2) return;
-    const others = tbl.filter((r) => r !== ssp2);
-    // premium-cost uncertainty range (client-side, default discount)
-    let premRange = "";
-    const sc = country.scenarios;
-    if (sc && sc.premium_pcts && sc.premium_pcts.length > 1) {
-      const vals = sc.premium_pcts
-        .map((p) => bcrAt(sc, ssp2.ssp, p, sc.default_discount, endYear()))
-        .filter((v) => v != null);
-      if (vals.length > 1) {
-        const lo = Math.min(...vals), hi = Math.max(...vals);
-        premRange = "cost uncertainty (premium " +
-          Math.round(100 * Math.min(...sc.premium_pcts)) + "–" +
-          Math.round(100 * Math.max(...sc.premium_pcts)) + "%): BCR " +
-          lo.toFixed(1) + "–" + hi.toFixed(1);
-      }
-    }
-    const bcrSub =
-      '<div class="sub">' +
-      others.map((r) => r.ssp + " <b>" + r.bcr.toFixed(2) + "</b>").join(" · ") +
-      (premRange ? "<br>" + premRange : "") + "</div>";
     const tiles = [
       [ICONS.aal, fmtUsd(m.baseline_aal_2025_usd) + "/yr", "Average annual loss (2025)", ""],
       [ICONS.gdp, (100 * m.aal_pct_gdp_2025).toFixed(1) + "%", "Annual loss as % of GDP", ""],
       [ICONS.fatalities, fmtInt.format(m.baseline_fatalities_2025_per_yr), "Expected fatalities /yr", ""],
-      [ICONS.bcr, ssp2.bcr.toFixed(2), "Benefit-cost ratio — SSP2, " + state.horizon + " yrs", bcrSub],
+      [ICONS.bcr, ssp2.bcr.toFixed(2), "Benefit-cost ratio — SSP2, " + state.horizon + " yrs", ""],
       [ICONS.lives, fmtInt.format(ssp2.lives_saved), "Lives saved to " + endYear(), ""],
       [ICONS.dalys, ssp2.dalys_averted != null ? fmtInt.format(ssp2.dalys_averted) : "–",
        "Healthy life-years protected (DALYs)", ""],
@@ -348,6 +330,17 @@
     const ctx = mp.context || {};
     const name = mp.name || mp.iso3;
     const items = [];
+    if (ctx.counterfactual && ctx.counterfactual.loss_reduction_pct != null) {
+      const cf = ctx.counterfactual;
+      items.push("<strong>The codes already on the books matter:</strong> " +
+        "re-running the " + cf.event_name + " through today's building stock, " +
+        "modelled losses are ~" + cf.loss_reduction_pct.toFixed(0) +
+        "% lower" + (cf.fatality_reduction_pct != null
+          ? " (fatalities ~" + cf.fatality_reduction_pct.toFixed(0) + "% lower)"
+          : "") +
+        " than if no code had ever been adopted. This validates the existing " +
+        "code's effect — not the proposed upgrade.");
+    }
     if (ctx.emdat_deaths) {
       items.push("<strong>Lives:</strong> for scale, " +
         fmtInt.format(ctx.emdat_deaths) + " " +
@@ -614,8 +607,11 @@
       return '<th class="sortable' + (c.num === false ? "" : " num") + '" data-key="' + c.k + '">' +
         c.label + (active ? ' <span class="arrow">' + (adm1Sort.dir < 0 ? "▼" : "▲") + "</span>" : "") + "</th>";
     }).join("") + "</tr>";
+    const jName = idx["admin_name"];
     html += rows.map((r, i) =>
-      "<tr><td class=rank>" + (i + 1) + "</td>" + ADM1_COLS.map((c) => {
+      '<tr class="adm1-row' + (r[jName] === selectedAdm1 ? " selected" : "") +
+      '" data-name="' + String(r[jName]).replace(/"/g, "&quot;") + '">' +
+      "<td class=rank>" + (i + 1) + "</td>" + ADM1_COLS.map((c) => {
         const v = r[idx[col(c)]];
         if (c.num === false) return "<td>" + v + "</td>";
         return '<td class="num">' + (v == null ? "–" : c.fmt(v)) + "</td>";
@@ -640,14 +636,23 @@
         '<a href="' + cp.atlas.url + '" target="_blank" rel="noopener">' +
         (cp.atlas.label || "GFDRR Building Regulations Atlas") + " ↗</a></p>";
     }
+    // the practice factor IS the modeled compliance share - headline it;
+    // the Atlas score is one input to it, never the ratio itself
+    const p = (mp.metrics || {}).practice_p_national;
+    if (p != null) {
+      html += '<div style="font-size:0.86rem"><strong>Estimated share of new construction ' +
+        "built to code: ~" + Math.round(100 * p) + "%</strong> " +
+        '<span class="note">(building practice factor)</span></div>';
+    }
     if (cp.score) {
-      html += '<div style="font-size:0.82rem"><strong>Compliance-mechanisms score: ' +
-        cp.score.score.toFixed(2) + "</strong> (" +
+      html += '<div class="score-bar"><div class="fill" style="width:' +
+        Math.round(100 * cp.score.score) + '%"></div></div>' +
+        '<div class="note" style="font-size:0.76rem">Atlas compliance-mechanisms score ' +
+        cp.score.score.toFixed(2) + " (" +
         Math.round(100 * cp.score.percentile) + "th percentile of " +
-        cp.score.n_countries + " countries; " + cp.score.n_indicators +
-        " Atlas indicators)</div>" +
-        '<div class="score-bar"><div class="fill" style="width:' +
-        Math.round(100 * cp.score.score) + '%"></div></div>';
+        cp.score.n_countries + " countries) — one input to the estimate above, " +
+        "alongside governance, education and corruption measures. A proxy for " +
+        "compliance, not the compliance rate itself.</div>";
     }
     if (cp.structural) {
       const items = cp.structural.items || [];
@@ -664,31 +669,28 @@
       items.filter((i) => !i.status).forEach((i) => {
         html += '<li class="note">? ' + i.name + " (not assessed)</li>";
       });
-      html += "</ul>";
+      html += "</ul>" +
+        '<div class="note" style="font-size:0.76rem">✓ provision found in the ' +
+        "country's regulations (per the Atlas) · ✗ not identified · " +
+        "? not assessed for this country.</div>";
     }
     const pkgs = cp.packages || [];
     if (pkgs.length) {
-      const tbl = sspTable(mp);
-      const ssp2 = tbl.find((r) => r.ssp === "SSP2") || tbl[0] || {};
       html += '<div style="font-size:0.84rem;margin-top:0.6rem"><strong>Compliance-improvement packages</strong></div>' +
-        '<div class="table-wrap"><table><tr><th>Package</th><th class=num>Gaps</th>' +
-        "<th class=num>Δ practice factor</th><th class=num>Extra benefits (" +
-        state.horizon + " yr)</th></tr>";
-      pkgs.forEach((p) => {
-        const extra = (p.benefit_uplift_pct != null && ssp2.npv_benefits_usd)
-          ? fmtUsd(ssp2.npv_benefits_usd * p.benefit_uplift_pct / 100) +
-            " (+" + p.benefit_uplift_pct.toFixed(1) + "%)"
-          : "–";
-        html += "<tr><td>" + p.label + '</td><td class="num">' + p.n_gaps +
-          '</td><td class="num">' + (p.delta_p != null ? "+" + p.delta_p.toFixed(3) : "–") +
-          '</td><td class="num">' + extra + "</td></tr>";
+        '<div class="table-wrap"><table><tr><th>Package</th>' +
+        "<th class=num>Missing mechanisms</th></tr>";
+      pkgs.forEach((p2) => {
+        html += "<tr><td>" + p2.label + '</td><td class="num">' + p2.n_gaps +
+          "</td></tr>";
       });
-      html += "</table></div>";
+      html += "</table></div>" +
+        '<div class="note" style="font-size:0.76rem">Ordered by expected effect ' +
+        "on compliance. Closing a package's gaps raises the share of buildings " +
+        "actually built to code.</div>";
     }
     el.innerHTML = html || "<p class='note'>No Atlas data for this country.</p>";
     if (note) {
-      note.textContent = (cp.structural && cp.structural.note ? cp.structural.note + " " : "") +
-        (cp.note || "");
+      note.textContent = (cp.structural && cp.structural.note ? cp.structural.note : "");
     }
   }
 
@@ -754,6 +756,7 @@
                      paint: { "line-color": "#555", "line-width": 0.3, "line-opacity": 0.4 } });
     }
     const emptyFc = { type: "FeatureCollection", features: [] };
+    country.boundaries = bnd || emptyFc;
     if (map.getSource("bnd")) {
       map.getSource("bnd").setData(bnd || emptyFc);
     } else {
@@ -764,7 +767,13 @@
       map.addLayer({ id: "adm0-line", type: "line", source: "bnd",
                      filter: ["==", ["get", "level"], 0],
                      paint: { "line-color": "#333", "line-width": 1.8 } });
+      map.addLayer({ id: "adm1-highlight", type: "line", source: "bnd",
+                     filter: ["==", ["get", "name"], "__none__"],
+                     paint: { "line-color": "#e8a33d", "line-width": 3 } });
     }
+    selectedAdm1 = null;
+    pinned = null;
+    tooltip.style.display = "none";
     // continuous hazard surface (image overlay; shown in the hazard view)
     const hz = mp.hazard_image;
     if (hz && hz.bounds) {
@@ -793,27 +802,92 @@
     renderRetrofit(rj);
   }
 
-  map.on("mousemove", "hex-fill", (ev) => {
-    const f = ev.features && ev.features[0];
-    if (!f) return;
-    const p = f.properties;
+  // hover shows the tooltip; CLICK pins it (hover stops updating until unpinned)
+  let pinned = null;   // JSON of the pinned hex's properties
+
+  function showHexTooltip(p, point, isPinned) {
     const lay = activeLayer();
     const bcr = p[suffix("bcr")];
     tooltip.style.display = "block";
-    tooltip.style.left = ev.point.x + 14 + "px";
-    tooltip.style.top = ev.point.y + 14 + "px";
+    tooltip.style.left = point.x + 14 + "px";
+    tooltip.style.top = point.y + 14 + "px";
     tooltip.innerHTML =
+      (isPinned ? "📌 " : "") +
       "<strong>" + lay.label + ": " + lay.fmt(p[suffix(lay.key)]) + "</strong><br>" +
       "hazard " + (p.pga_475 != null ? p.pga_475.toFixed(2) + " g" : "–") +
       " · value " + fmtUsd(p.repl_value) +
       "<br>annual loss " + fmtUsd(p.aal_2025) + "/yr · BCR " +
-      (bcr != null ? (+bcr).toFixed(2) : "–");
+      (bcr != null ? (+bcr).toFixed(2) : "–") +
+      (isPinned ? '<br><span style="color:var(--muted)">click again or press Esc to unpin</span>' : "");
+  }
+
+  map.on("mousemove", "hex-fill", (ev) => {
     map.getCanvas().style.cursor = "pointer";
+    if (pinned) return;
+    const f = ev.features && ev.features[0];
+    if (!f) return;
+    showHexTooltip(f.properties, ev.point, false);
   });
   map.on("mouseleave", "hex-fill", () => {
-    tooltip.style.display = "none";
+    if (!pinned) tooltip.style.display = "none";
     map.getCanvas().style.cursor = "";
   });
+  map.on("click", "hex-fill", (ev) => {
+    const f = ev.features && ev.features[0];
+    if (!f) return;
+    const key = JSON.stringify(f.properties);
+    if (pinned === key) {
+      pinned = null;
+      tooltip.style.display = "none";
+      return;
+    }
+    pinned = key;
+    showHexTooltip(f.properties, ev.point, true);
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && pinned) {
+      pinned = null;
+      tooltip.style.display = "none";
+    }
+  });
+
+  // ADM1 ranking row -> highlight + zoom the province on the map
+  let selectedAdm1 = null;
+
+  function featureBbox(geom) {
+    let w = 180, s = 90, e = -180, n = -90;
+    (function walk(c) {
+      if (typeof c[0] === "number") {
+        w = Math.min(w, c[0]); e = Math.max(e, c[0]);
+        s = Math.min(s, c[1]); n = Math.max(n, c[1]);
+      } else c.forEach(walk);
+    })(geom.coordinates);
+    return [[w, s], [e, n]];
+  }
+
+  function selectAdm1(name) {
+    const bnd = country && country.boundaries;
+    if (!bnd || !map.getLayer("adm1-highlight")) return;
+    if (selectedAdm1 === name) {   // toggle off: back to the country view
+      selectedAdm1 = null;
+      map.setFilter("adm1-highlight", ["==", ["get", "name"], " "]);
+      const e0 = index.find((c) => c.iso3 === state.iso);
+      if (e0 && e0.bounds) {
+        map.fitBounds([[e0.bounds[0], e0.bounds[1]], [e0.bounds[2], e0.bounds[3]]],
+                      { padding: 30, duration: 500 });
+      }
+      renderAdm1();
+      return;
+    }
+    const f = (bnd.features || []).find((x) =>
+      x.properties && x.properties.level === 1 && x.properties.name === name);
+    if (!f) return;
+    selectedAdm1 = name;
+    map.setFilter("adm1-highlight",
+                  ["all", ["==", ["get", "level"], 1], ["==", ["get", "name"], name]]);
+    map.fitBounds(featureBbox(f.geometry), { padding: 40, duration: 500 });
+    renderAdm1();
+  }
 
   document.getElementById("view-toggle").addEventListener("click", (ev) => {
     const btn = ev.target.closest("button[data-view]");
@@ -856,11 +930,15 @@
   });
   document.getElementById("adm1-table").addEventListener("click", (ev) => {
     const th = ev.target.closest("th.sortable");
-    if (!th) return;
-    const key = th.dataset.key;
-    if (adm1Sort.key === key) adm1Sort.dir = -adm1Sort.dir;
-    else { adm1Sort.key = key; adm1Sort.dir = key === "admin_name" ? 1 : -1; }
-    renderAdm1();
+    if (th) {
+      const key = th.dataset.key;
+      if (adm1Sort.key === key) adm1Sort.dir = -adm1Sort.dir;
+      else { adm1Sort.key = key; adm1Sort.dir = key === "admin_name" ? 1 : -1; }
+      renderAdm1();
+      return;
+    }
+    const tr = ev.target.closest("tr.adm1-row");
+    if (tr) selectAdm1(tr.dataset.name);
   });
   horizonSelect.addEventListener("change", () => {
     state.horizon = +horizonSelect.value;

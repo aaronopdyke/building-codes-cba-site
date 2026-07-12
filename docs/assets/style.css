@@ -65,6 +65,7 @@ a:hover { text-decoration: underline; }
 .site-footer a { color: var(--ink-2); }
 
 .content { max-width: 900px; margin: 0 auto; padding: 1.25rem; }
+.content.wide { max-width: 1150px; }
 .content h1 { font-size: 1.5rem; margin: 0.5rem 0 0.25rem; }
 .content h2 { font-size: 1.15rem; margin: 1.6rem 0 0.5rem; }
 .content p.lede { color: var(--ink-2); max-width: 75ch; }
@@ -146,10 +147,12 @@ a:hover { text-decoration: underline; }
 
 .method-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(4, 1fr);   /* all four steps on one row */
   gap: 0.9rem;
   margin-top: 0.8rem;
 }
+@media (max-width: 900px) { .method-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .method-grid { grid-template-columns: 1fr; } }
 .method-card {
   background: var(--surface);
   border: 1px solid var(--hairline);
@@ -321,11 +324,14 @@ select {
 .chart-ctl { display: inline-flex; align-items: center; gap: 0.3rem; }
 .chart-ctl label { color: var(--muted); }
 
-/* sortable ADM1 ranking table */
+/* sortable ADM1 ranking table (rows click-link to the map) */
 #adm1-table th.sortable { cursor: pointer; user-select: none; }
 #adm1-table th.sortable:hover { color: var(--ink); }
 #adm1-table th .arrow { font-size: 0.65rem; color: var(--accent-dark); }
 #adm1-table td.rank { color: var(--muted); text-align: right; }
+#adm1-table tr.adm1-row { cursor: pointer; }
+#adm1-table tr.adm1-row:hover td { background: #f1efe8; }
+#adm1-table tr.adm1-row.selected td { background: #fdf0d9; }
 
 /* BCR tile: small per-SSP row + uncertainty subtext */
 .tile .sub { font-size: 0.66rem; color: var(--muted); line-height: 1.35; }

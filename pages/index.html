@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Building Codes CBA — do seismic building codes pay off?</title>
-<meta name="description" content="A cost-benefit explorer for seismic building-code adoption and enforcement: gridded exposure, GEM hazard and vulnerability, and the Triple Dividend of Resilience.">
+<title>Building Codes CBA — do building codes pay off?</title>
+<meta name="description" content="A cost-benefit explorer for building-code adoption and enforcement: gridded exposure, hazard and vulnerability modelling, and the Triple Dividend of Resilience.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%9A%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -23,9 +23,9 @@
 <section class="hero">
   <svg id="hexfield" aria-hidden="true"></svg>
   <div class="hero-inner">
-    <h1>Do seismic building codes pay off?</h1>
-    <p class="tagline">A gridded cost-benefit explorer for adopting and enforcing
-    stronger building codes — avoided losses, lives, jobs and growth, on one map.</p>
+    <h1>Do building codes pay off?</h1>
+    <p class="tagline">A cost-benefit explorer for adopting and enforcing
+    stronger building codes — avoided damage, lives, jobs and growth.</p>
     <div class="hero-cta">
       <select id="landing-country" aria-label="Choose a country">
         <option value="">Choose a country…</option>
@@ -35,25 +35,25 @@
   </div>
 </section>
 
-<div class="content">
+<div class="content wide">
   <h2>How the tool works</h2>
   <div class="method-grid">
     <div class="method-card">
       <div class="m-num">1</div>
       <h3>Model today's buildings</h3>
-      <p>Floor areas and building counts on a 1&nbsp;km grid, valued with GEM's
-      unit construction costs and typology mix per admin-1. The existing stock's
-      seismic code levels blend GHSL construction vintages with GEM's
-      performance-based shares (Crowley et&nbsp;al. 2021 ladder: none → low →
-      moderate → high code).</p>
+      <p>Floor areas and building counts on a 1&nbsp;km grid, valued with unit
+      construction costs and the local mix of building types. The existing
+      stock's code levels come from construction vintages blended with
+      performance-based judgments of design practice (none → low → moderate →
+      high code).</p>
     </div>
     <div class="method-card">
       <div class="m-num">2</div>
-      <h3>Shake them</h3>
-      <p>The GEM Global Seismic Hazard Map (PGA, 5 return periods) meets GEM
-      vulnerability functions per building class — giving average annual losses
-      and expected fatalities for the stock as it is, and as it would be under a
-      stronger code, compliance scaled by a building practice factor.</p>
+      <h3>Stress-test them</h3>
+      <p>Hazard maps meet vulnerability functions per building class
+      (currently earthquake) — giving average annual damage and expected
+      fatalities for the stock as it is, and as it would be under a stronger
+      code, with compliance scaled by a building practice factor.</p>
     </div>
     <div class="method-card">
       <div class="m-num">3</div>
@@ -67,7 +67,7 @@
       <div class="m-num">4</div>
       <h3>Count all three dividends</h3>
       <p>One benefit-cost ratio counts the
-      <em>Triple Dividend of Resilience</em>: avoided losses (plus avoided
+      <em>Triple Dividend of Resilience</em>: avoided damage (plus avoided
       reconstruction carbon), unlocked economic potential (investment stimulus,
       jobs), and co-benefits (durability). Lives and healthy life-years are
       counted, never monetised. Choose a 25-, 50- or 75-year horizon.</p>
@@ -130,7 +130,7 @@
       index.forEach(function (c) {
         var o = document.createElement("option");
         o.value = c.iso3;
-        o.textContent = c.name + "  (BCR " + (c.bcr_ssp2 != null ? c.bcr_ssp2.toFixed(1) : "–") + ")";
+        o.textContent = c.name;
         sel.appendChild(o);
       });
     }).catch(function () {});
