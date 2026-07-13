@@ -240,6 +240,86 @@
     el.innerHTML = htmlStr;
   }
 
+  // continuous-gradient legend for the linear-ramp metrics: a fixed scale
+  // spanning the whole control space, so colors stay comparable as the
+  // premium / practice-factor toggles move
+  function drawLegendContinuous(label, stops, lo, hi, fmt, mid) {
+    const el = document.getElementById("legend");
+    const pctOf = (v) => Math.max(0, Math.min(100, 100 * (v - lo) / (hi - lo || 1)));
+    const grad = stops.map((s) =>
+      s[1] + " " + pctOf(s[0]).toFixed(1) + "%").join(", ");
+    el.innerHTML = "<strong>" + label + "</strong>" +
+      '<span class="grad-wrap"><span class="grad-bar" style="background:linear-gradient(90deg, ' +
+      grad + ')">' +
+      (mid != null && mid > lo && mid < hi
+        ? '<span class="grad-tick" style="left:' + pctOf(mid).toFixed(1) + '%"></span>'
+        : "") +
+      "</span>" +
+      '<span class="grad-labels"><span>' + fmt(lo) + "</span>" +
+      (mid != null && mid > lo && mid < hi
+        ? "<span>" + fmt(mid) + "</span>" : "") +
+      "<span>" + fmt(hi) + "</span></span></span>";
+  }
+
+  // fixed color domains for the toggle-sensitive metrics: BCR and total
+  // benefits across the WHOLE control space (practice-factor range x premium
+  // 1-12%), pooled over all horizons; p2/p98 so one outlier hex can't stretch
+  // the ramp. Both quantities are monotone in each control, so the corner
+  // combinations per hex give the exact extremes.
+  function computeMapDomains(hex, sc) {
+    if (!sc || !sc.bfp || !hex) return null;
+    const kLo = sc.bfp.k_min, kHi = sc.bfp.k_max;
+    const p0 = sc.default_premium_pct, m = sc.m_ref || 1.1;
+    const rLo = Math.min(...sc.premium_pcts, p0) / p0;
+    const rHi = Math.max(...sc.premium_pcts, p0) / p0;
+    const bcrLo = [], bcrHi = [], benVals = [];
+    (hex.features || []).forEach((f) => {
+      const p = f.properties;
+      [25, 50, 75].forEach((y) => {
+        const B = +p["npv_benefits_h" + y], C = +p["npv_costs_h" + y],
+              P = +p["npv_premium_h" + y];
+        if (!isFinite(B) || !isFinite(C) || !isFinite(P) || B <= 0) return;
+        const ben = (k, r) => k * B + m * (k * r - k) * P;
+        const cost = (k, r) => k * r * P + (C - P);
+        if (ben(kHi, rHi) > 0) benVals.push(ben(kHi, rHi));
+        // BCR max at (k_max, premium_min); min at (k_min, premium_max)
+        if (cost(kHi, rLo) > 0) bcrHi.push(ben(kHi, rLo) / cost(kHi, rLo));
+        if (cost(kLo, rHi) > 0) bcrLo.push(ben(kLo, rHi) / cost(kLo, rHi));
+      });
+    });
+    const q = (arr, f) => {
+      if (!arr.length) return null;
+      arr.sort((a, b) => a - b);
+      return arr[Math.min(arr.length - 1, Math.max(0, Math.floor(f * arr.length)))];
+    };
+    const bLo = Math.max(0, q(bcrLo, 0.02) || 0);
+    const bHi = Math.max(q(bcrHi, 0.98) || 2, 1.2);
+    return {
+      bcr: [Math.min(bLo, 0.99), bHi],   // keep 1.0 inside the scale
+      ben: [Math.max(1, q(benVals, 0.02) || 1),
+            Math.max(q(benVals, 0.98) || 10, 10)],
+    };
+  }
+
+  // interpolation stops for the continuous ramps
+  function bcrStops(lo, hi) {
+    const s = [];
+    if (lo < 1) {
+      s.push([lo, BCR_REDS[0]], [(lo + 1) / 2, BCR_REDS[2]], [1.0, "#f7f7f7"]);
+    } else {
+      s.push([lo, "#f7f7f7"]);
+    }
+    s.push([1 + (hi - 1) * 0.33, BCR_BLUES[1]],
+           [1 + (hi - 1) * 0.66, BCR_BLUES[2]], [hi, BCR_BLUES[4]]);
+    return s;
+  }
+  function benStops(lo, hi) {   // positions in log10 space
+    const l0 = Math.log10(lo), l1 = Math.log10(hi);
+    const at = (f) => l0 + f * (l1 - l0);
+    return [[at(0), RAMP_GNBU[0]], [at(0.33), RAMP_GNBU[2]],
+            [at(0.66), RAMP_GNBU[4]], [at(1), RAMP_GNBU[6]]];
+  }
+
   function styleHexLayer() {
     if (!country || !map.getLayer("hex-fill")) return;
     const mp = country.metrics_payload;
@@ -256,19 +336,61 @@
       const hz = mp.hazard_image;
       drawLegend({ label: lay.label, ramp: hz.colors, fmt: lay.fmt },
                  hz.bins.slice(0, hz.colors.length - 1));
+    } else if ((lay.key === "bcr" || lay.key === "npv_benefits") &&
+               country.mapDomains) {
+      // continuous linear ramp on a FIXED domain spanning the whole control
+      // space - colors stay comparable as the toggles move
+      const sc = country.scenarios;
+      const kBen = state.bfpK;
+      const kPrem = state.bfpK *
+        ((state.prem || sc.default_premium_pct) / sc.default_premium_pct);
+      const premP = ["to-number", ["get", suffix("npv_premium")]];
+      const benE = ["+", ["*", kBen, ["to-number", ["get", suffix("npv_benefits")]]],
+                    ["*", (sc.m_ref || 1.1) * (kPrem - kBen), premP]];
+      const costE = ["+", ["*", kPrem, premP],
+                     ["-", ["to-number", ["get", suffix("npv_costs")]], premP]];
+      let colorExpr, dom, stops, fmtL, mid;
+      if (lay.key === "bcr") {
+        dom = country.mapDomains.bcr;
+        stops = bcrStops(dom[0], dom[1]);
+        const interp = ["interpolate", ["linear"], ["/", benE, costE]]
+          .concat(stops.flat());
+        colorExpr = ["case",
+          ["all", ["==", ["typeof", ["get", suffix("bcr")]], "number"],
+           [">", costE, 0]],
+          interp, NODATA];
+        fmtL = (v) => v.toFixed(1);
+        mid = 1.0;
+      } else {
+        dom = country.mapDomains.ben;
+        stops = benStops(dom[0], dom[1]);
+        const interp = ["interpolate", ["linear"],
+                        ["log10", ["max", benE, 1]]].concat(stops.flat());
+        colorExpr = ["case",
+          ["==", ["typeof", ["get", suffix("npv_benefits")]], "number"],
+          interp, NODATA];
+        fmtL = fmtUsd;
+      }
+      map.setPaintProperty("hex-fill", "fill-color", colorExpr);
+      const label = lay.label + " — at " + Math.round(100 * currentP()) +
+        "% practice / " + Math.round(100 * (state.prem || 0)) + "% premium" +
+        (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "") +
+        " · fixed scale across all settings";
+      if (lay.key === "npv_benefits") {
+        // legend gradient positions live in log space; label with real values
+        drawLegendContinuous(label, stops, stops[0][0],
+                             stops[stops.length - 1][0],
+                             (v) => fmtUsd(Math.pow(10, v)), null);
+      } else {
+        drawLegendContinuous(label, stops, dom[0], dom[1], fmtL, mid);
+      }
     } else {
       const bins = binsFor(lay.key);
       const ramp = lay.ramp || (lay.key === "bcr" ? bcrRamp(bins) : RAMP_SEQ);
       const expr = scaledMapExpr(lay.key);
       map.setPaintProperty("hex-fill", "fill-color",
                            fillExpr(suffix(lay.key), ramp, bins, expr));
-      let label = lay.label;
-      if (expr) {
-        label += " — at " + Math.round(100 * currentP()) + "% practice / " +
-          (100 * (state.prem || 0)).toFixed(1) + "% premium" +
-          (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "");
-      }
-      drawLegend({ label: label, ramp: ramp, fmt: lay.fmt }, bins);
+      drawLegend({ label: lay.label, ramp: ramp, fmt: lay.fmt }, bins);
     }
     document.querySelectorAll("#metric-toggle button").forEach((b) =>
       b.setAttribute("aria-pressed", String(state.view === "risk" && b.dataset.metric === state.metric)));
@@ -374,7 +496,9 @@
         "introduces the first one (" + (CD_PLAIN[it.target] || it.target) + ").</div>";
       return;
     }
-    const W = 900, H = 74, PADL = 30, PADR = 150, Y = 46;
+    // labels alternate fully ABOVE and fully BELOW the line so nothing can
+    // overlap the markers, whatever the spacing of adoption years
+    const W = 900, H = 108, PADL = 30, PADR = 175, Y = 54;
     const y0 = Math.min(events[0].yr - 6, 1985);
     const y1 = 2026;
     const X = (yr) => PADL + ((yr - y0) / (y1 - y0)) * (W - PADL - PADR);
@@ -387,30 +511,38 @@
       const above = i % 2 === 0;
       const codeName = names[e.lvl];
       const plain = (CD_PLAIN[e.lvl] || e.lvl).replace(/^an? /, "");
+      // above: name / sublabel / year stacked upward from the line;
+      // below: stacked downward. 12px of clearance beyond the r=6 marker.
+      const yName = above ? Y - 34 : Y + 30;
+      const ySub = above ? Y - 22 : Y + 42;
+      const yYear = above ? Y - 46 : Y + 54;
       s += '<circle cx="' + x + '" cy="' + Y + '" r="6" fill="#2a78d6"/>' +
-        '<text x="' + x + '" y="' + (Y + 20) +
-        '" font-size="11" text-anchor="middle" fill="#52514e">' + e.yr + "</text>" +
-        '<text x="' + x + '" y="' + (above ? Y - 14 : Y - 30) +
+        '<text x="' + x + '" y="' + yYear +
+        '" font-size="10" text-anchor="middle" fill="#898781">' + e.yr + "</text>" +
+        '<text x="' + x + '" y="' + yName +
         '" font-size="11" text-anchor="middle" fill="#0b0b0b" font-weight="600">' +
         (codeName || plain) + "</text>" +
         (codeName
-          ? '<text x="' + x + '" y="' + (above ? Y - 3 : Y - 19) +
+          ? '<text x="' + x + '" y="' + ySub +
             '" font-size="9" text-anchor="middle" fill="#898781">' +
             plain + "</text>"
           : "");
     });
-    // the proposed step (dashed, at "next")
+    // the proposed step (dashed, at "next"); label wraps to two lines so it
+    // never clips at the right edge
     const xp = W - PADR + 20;
-    const propLabel = it.kind === "enforcement"
-      ? "proposed: stronger enforcement"
-      : "proposed: " + (CD_PLAIN[it.target] || it.target || "").replace(/^a /, "") +
+    const propMain = it.kind === "enforcement"
+      ? "stronger enforcement"
+      : (CD_PLAIN[it.target] || it.target || "").replace(/^an? /, "") +
         (it.target ? " (" + it.target + ")" : "");
     s += '<line x1="' + xp + '" x2="' + (xp + 26) + '" y1="' + Y + '" y2="' + Y +
       '" stroke="#e8a33d" stroke-width="2" stroke-dasharray="4 3"/>' +
       '<circle cx="' + (xp + 26) + '" cy="' + Y + '" r="6" fill="none" ' +
       'stroke="#e8a33d" stroke-width="2"/>' +
-      '<text x="' + (xp + 34) + '" y="' + (Y + 4) +
-      '" font-size="11" fill="#7a5a00">' + propLabel + "</text>";
+      '<text x="' + (xp + 36) + '" y="' + (Y - 4) +
+      '" font-size="10" fill="#7a5a00">proposed:</text>' +
+      '<text x="' + (xp + 36) + '" y="' + (Y + 9) +
+      '" font-size="11" font-weight="600" fill="#7a5a00">' + propMain + "</text>";
     s += "</svg>";
     el.innerHTML = s;
   }
@@ -1045,7 +1177,8 @@
       json(base + "retrofit.json").catch(() => null),
       json(base + "boundaries.geojson").catch(() => null),
     ]);
-    country = { metrics_payload: mp, scenarios: sc, adm1: adm1 };
+    country = { metrics_payload: mp, scenarios: sc, adm1: adm1,
+                mapDomains: computeMapDomains(hex, sc) };
     if (mp.horizon_years && !mp.horizon_years.includes(state.horizon)) {
       state.horizon = mp.default_horizon || mp.horizon_years[0];
       horizonSelect.value = String(state.horizon);

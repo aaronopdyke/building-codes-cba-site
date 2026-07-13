@@ -308,6 +308,28 @@ select {
 .legend { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; font-size: 0.78rem; color: var(--ink-2); }
 .legend .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15); vertical-align: -2px; margin-right: 3px; }
 
+/* continuous-gradient legend (fixed-scale metrics) */
+.legend .grad-wrap { display: inline-flex; flex-direction: column; min-width: 220px; }
+.legend .grad-bar {
+  position: relative;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+.legend .grad-tick {
+  position: absolute;
+  top: -3px; bottom: -3px;
+  width: 2px;
+  background: var(--ink);
+}
+.legend .grad-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
 .map-tooltip {
   position: absolute;
   pointer-events: none;
