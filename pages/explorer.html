@@ -55,16 +55,20 @@
   <div class="legend" id="legend" aria-label="Map legend"></div>
 </div>
 
-<main>
+<main class="explorer">
+  <p class="scenario" id="scenario"></p>
+
+  <!-- headline statistics: one full-width row, grouped -->
+  <div class="tile-groups" id="tiles"></div>
+  <ul class="tile-context" id="tile-context"></ul>
+
+  <!-- map beside the economics panels; the map ends where the dividends end -->
   <div class="layout">
     <div class="map-wrap">
       <div id="map" aria-label="Hex-tile map of CBA results"></div>
       <div class="map-tooltip" id="tooltip" role="status"></div>
     </div>
     <aside class="side">
-      <p class="scenario" id="scenario"></p>
-      <div class="tiles" id="tiles"></div>
-      <ul class="tile-context" id="tile-context"></ul>
       <section class="panel">
         <h3 id="chart-title">Cumulative discounted benefits vs costs</h3>
         <div class="chart-controls">
@@ -87,24 +91,43 @@
         <div id="dividends"></div>
         <p class="note" id="dividends-note"></p>
       </section>
-      <section class="panel">
-        <h3>Admin-1 ranking</h3>
-        <div class="table-wrap"><table id="adm1-table"></table></div>
-        <p class="note" id="adm1-note">Click a column header to sort. National program costs are
-          allocated to provinces by their share of new construction value.</p>
-      </section>
-      <section class="panel">
-        <h3>Regulatory profile &amp; compliance</h3>
-        <div id="compliance"></div>
-        <p class="note" id="compliance-note"></p>
-      </section>
-      <section class="panel">
-        <h3>Retrofit priorities — existing stock</h3>
-        <div class="table-wrap"><table id="retrofit-table"></table></div>
-        <p class="note" id="retrofit-note"></p>
-      </section>
     </aside>
   </div>
+
+  <section class="band">
+    <h2>Where to act — ranking sub-national areas</h2>
+    <p class="band-note">Compare provinces to identify where a code program delivers
+      the most: sort by any column, click a row to zoom the map to that area.</p>
+    <div class="panel">
+      <div class="table-wrap"><table id="adm1-table"></table></div>
+      <p class="note" id="adm1-note">National program costs are allocated to
+        provinces by their share of new construction value.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <h2>What to reform — regulatory profile &amp; compliance</h2>
+    <p class="band-note">The country's current regulations and enforcement machinery
+      (GFDRR Building Regulations Atlas), the specific provisions a code upgrade
+      would add, and the compliance mechanisms that would raise the share of
+      buildings actually built to code.</p>
+    <div class="panel">
+      <div id="compliance"></div>
+      <p class="note" id="compliance-note"></p>
+    </div>
+  </section>
+
+  <section class="band">
+    <h2>Beyond new construction — retrofit screening of the existing stock</h2>
+    <p class="band-note">The CBA above covers new construction only. Retrofitting
+      existing buildings is a separate lever — this preliminary screening ranks
+      building classes by how much retrofit would matter (TA targeting, not
+      engineering estimates).</p>
+    <div class="panel">
+      <div class="table-wrap"><table id="retrofit-table"></table></div>
+      <p class="note" id="retrofit-note"></p>
+    </div>
+  </section>
 </main>
 
 <footer class="site-footer">

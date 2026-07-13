@@ -177,28 +177,73 @@ a:hover { text-decoration: underline; }
 .pkg-ok { color: #2e7d32; }
 .pkg-gap { color: #b03030; }
 
-/* ---- explorer layout ---- */
+/* ---- explorer layout ----
+   headline tiles span the page; the map sits beside the chart + dividends
+   panels and stretches only as tall as they are; ranked/regulatory/retrofit
+   sections follow full-width below. */
 .map-page { min-height: 100vh; display: flex; flex-direction: column; }
 .map-page main { flex: 1; min-height: 0; }
+main.explorer {
+  width: 100%;
+  max-width: 1250px;
+  margin: 0 auto;
+  padding: 0.9rem 1.25rem 1.5rem;
+}
+main.explorer .scenario { margin-top: 0; }
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
-  gap: 0;
-  height: 100%;
-  min-height: 540px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(330px, 1fr);
+  gap: 0.9rem;
+  align-items: stretch;   /* map height follows the panels beside it */
 }
-.map-wrap { position: relative; min-height: 540px; }
+.map-wrap {
+  position: relative;
+  min-height: 480px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
 #map { position: absolute; inset: 0; }
-.side {
-  padding: 0.9rem;
-  overflow-y: auto;
-  background: var(--page);
-  border-left: 1px solid var(--hairline);
-}
+.side { min-width: 0; }
+.side .panel:last-child { margin-bottom: 0; }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .map-wrap { min-height: 420px; }
 }
+
+/* full-width sections below the map */
+.band { margin-top: 1.4rem; }
+.band h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.15rem;
+  padding-top: 0.9rem;
+  border-top: 2px solid var(--hairline);
+}
+.band-note { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.6rem; max-width: 75ch; }
+
+/* grouped headline tiles: one row across the page */
+.tile-groups {
+  display: grid;
+  grid-template-columns: 3fr 3fr 2fr;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+@media (max-width: 900px) { .tile-groups { grid-template-columns: 1fr; } }
+.tgroup {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.7rem 0.6rem;
+}
+.tgroup h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.tgroup .tiles { margin-bottom: 0; }
+.tgroup .tile { border: 0; padding: 0.1rem 0.2rem; background: none; }
 
 .controls {
   display: flex;
