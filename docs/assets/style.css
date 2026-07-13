@@ -212,9 +212,25 @@ a:hover { text-decoration: underline; }
   gap: 0.25rem;
   margin-bottom: 0.85rem;
 }
-.assumptions .control-group > label { font-size: 0.8rem; color: var(--ink-2); }
-.assumptions .segmented { flex-wrap: wrap; }
-.assumptions .segmented button { padding: 0.22rem 0.5rem; font-size: 0.78rem; }
+.assumptions .control-group > label { font-size: 0.8rem; color: var(--ink-2); font-weight: 600; }
+.assumptions .ctl-def { font-size: 0.7rem; color: var(--muted); line-height: 1.35; }
+/* uniform-width option chips: a fixed grid so every option is the same size
+   regardless of how many wrap to the last row */
+.assumptions .seg-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  border: 0;
+  overflow: visible;
+  border-radius: 0;
+}
+.assumptions .seg-grid button {
+  border: 1px solid var(--baseline) !important;
+  border-radius: 5px;
+  padding: 0.22rem 0.1rem;
+  font-size: 0.76rem;
+  text-align: center;
+}
 .assumptions select { width: 100%; }
 .assumptions .bfp-group input[type="range"] { width: 100%; }
 @media (max-width: 900px) {

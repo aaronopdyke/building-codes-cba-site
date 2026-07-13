@@ -24,38 +24,44 @@
 <div class="page-wrap">
 <!-- everything that is an ANALYTICAL ASSUMPTION lives in this sidebar;
      changing it flows through the tiles, chart, dividends and the map -->
-<aside class="assumptions" aria-label="Analysis assumptions">
-  <h3>Assumptions</h3>
+<aside class="assumptions" aria-label="Analysis settings">
+  <h3>Analysis settings</h3>
   <div class="control-group">
     <label for="country-select">Country</label>
     <select id="country-select"></select>
+    <span class="ctl-def">Pilot country shown across the whole page.</span>
   </div>
   <div class="control-group">
-    <label for="horizon-select" title="How far into the future benefits and costs are counted">Horizon</label>
+    <label for="horizon-select">Horizon</label>
     <select id="horizon-select">
       <option value="25">25 years (2050)</option>
       <option value="50" selected>50 years (2075)</option>
       <option value="75">75 years (2100)</option>
     </select>
+    <span class="ctl-def">How many years of benefits and costs are counted.</span>
   </div>
   <div class="control-group">
     <label>Discount rate</label>
-    <div class="segmented" id="disc-toggle" role="group" aria-label="Discount rate"></div>
+    <div class="segmented seg-grid" id="disc-toggle" role="group" aria-label="Discount rate"></div>
+    <span class="ctl-def">How strongly future benefits and costs are down-weighted
+      to today's dollars.</span>
   </div>
   <div class="control-group">
-    <label title="Construction-cost increase, % of structural cost">Construction premium</label>
-    <div class="segmented" id="prem-toggle" role="group" aria-label="Construction premium"></div>
+    <label>Construction premium</label>
+    <div class="segmented seg-grid" id="prem-toggle" role="group" aria-label="Construction premium"></div>
+    <span class="ctl-def">Extra cost of building to the stronger code, as a share
+      of structural construction cost (• = this country's default).</span>
   </div>
-  <div class="control-group bfp-group" title="Share of new construction actually built to code. Benefits, premium costs and lives saved scale with it; today's risk does not.">
+  <div class="control-group bfp-group">
     <label for="bfp-slider">Practice factor</label>
     <input type="range" id="bfp-slider" min="0" max="100" step="1" value="50">
     <span class="bfp-val" id="bfp-value">–</span>
+    <span class="ctl-def">Share of new construction actually built to code.
+      Scales benefits, premium costs and lives saved; today's risk is unaffected.</span>
   </div>
 </aside>
 
 <main class="explorer">
-  <p class="scenario" id="scenario"></p>
-
   <!-- map beside the economics panels; the map ends where the dividends end -->
   <div class="layout">
     <div class="map-col">
@@ -99,8 +105,9 @@
     </aside>
   </div>
 
-  <!-- code-adoption history, under the map -->
-  <div class="code-timeline" id="code-timeline" style="margin-top:0.9rem"
+  <!-- scenario description + code-adoption history, under the map -->
+  <p class="scenario" id="scenario" style="margin-top:0.9rem"></p>
+  <div class="code-timeline" id="code-timeline"
        aria-label="Building-code adoption timeline"></div>
 
   <!-- headline statistics: one full-width row, grouped -->

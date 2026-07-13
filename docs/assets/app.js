@@ -240,31 +240,12 @@
     el.innerHTML = htmlStr;
   }
 
-  // continuous-gradient legend for the linear-ramp metrics: a fixed scale
-  // spanning the whole control space, so colors stay comparable as the
-  // premium / practice-factor toggles move
-  function drawLegendContinuous(label, stops, lo, hi, fmt, mid) {
-    const el = document.getElementById("legend");
-    const pctOf = (v) => Math.max(0, Math.min(100, 100 * (v - lo) / (hi - lo || 1)));
-    const grad = stops.map((s) =>
-      s[1] + " " + pctOf(s[0]).toFixed(1) + "%").join(", ");
-    el.innerHTML = "<strong>" + label + "</strong>" +
-      '<span class="grad-wrap"><span class="grad-bar" style="background:linear-gradient(90deg, ' +
-      grad + ')">' +
-      (mid != null && mid > lo && mid < hi
-        ? '<span class="grad-tick" style="left:' + pctOf(mid).toFixed(1) + '%"></span>'
-        : "") +
-      "</span>" +
-      '<span class="grad-labels"><span>' + fmt(lo) + "</span>" +
-      (mid != null && mid > lo && mid < hi
-        ? "<span>" + fmt(mid) + "</span>" : "") +
-      "<span>" + fmt(hi) + "</span></span></span>";
-  }
-
-  // color domain for the toggle-sensitive metrics: the min/max of the cells
-  // AT THE CURRENT SETTING (p2/p98 so one outlier hex can't flatten the
-  // ramp) - full within-map contrast; the legend restates the setting.
-  function currentMapDomain(key) {
+  // quintile bin edges for the toggle-sensitive metrics, computed from the
+  // cells AT THE CURRENT SETTING - five balanced classes at every combination
+  // (same quantile approach as the loss metrics); the legend restates the
+  // setting. BCR bins additionally get the 1.0 edge inserted whenever the
+  // range straddles it, so the red/blue break-even split survives.
+  function currentQuintileBins(key) {
     const sc = country && country.scenarios;
     const feats = country && country.hexFeatures;
     if (!sc || !feats) return null;
@@ -284,33 +265,15 @@
         vals.push(ben);
       }
     });
-    if (vals.length < 4) return null;
+    if (vals.length < 10) return null;
     vals.sort((a, b) => a - b);
-    const q = (f) => vals[Math.min(vals.length - 1,
-                                   Math.max(0, Math.floor(f * vals.length)))];
-    let lo = q(0.02), hi = q(0.98);
-    if (hi - lo < 1e-9) { lo *= 0.9; hi *= 1.1; }
-    return [lo, hi];
-  }
-
-  // interpolation stops for the continuous BCR ramp (diverging around 1.0
-  // when the range straddles it; single-hue otherwise)
-  function bcrStops(lo, hi) {
-    if (hi <= 1) {   // everything below break-even: reds only
-      return [[lo, BCR_REDS[0]], [(lo + hi) / 2, BCR_REDS[2]], [hi, "#fddbc7"]];
+    const q = (f) => vals[Math.min(vals.length - 1, Math.floor(f * vals.length))];
+    let edges = [q(0.2), q(0.4), q(0.6), q(0.8)];
+    if (key === "bcr" && vals[0] < 1 && vals[vals.length - 1] > 1) {
+      edges.push(1.0);   // keep the break-even split
     }
-    if (lo >= 1) {   // everything above break-even: blues only
-      return [[lo, BCR_BLUES[0]], [lo + (hi - lo) * 0.5, BCR_BLUES[2]],
-              [hi, BCR_BLUES[4]]];
-    }
-    return [[lo, BCR_REDS[0]], [(lo + 1) / 2, BCR_REDS[2]], [1.0, "#f7f7f7"],
-            [1 + (hi - 1) * 0.5, BCR_BLUES[2]], [hi, BCR_BLUES[4]]];
-  }
-  function benStops(lo, hi) {   // positions in log10 space
-    const l0 = Math.log10(lo), l1 = Math.log10(hi);
-    const at = (f) => l0 + f * (l1 - l0);
-    return [[at(0), RAMP_GNBU[0]], [at(0.33), RAMP_GNBU[2]],
-            [at(0.66), RAMP_GNBU[4]], [at(1), RAMP_GNBU[6]]];
+    edges = [...new Set(edges.map((e) => +e.toPrecision(3)))].sort((a, b) => a - b);
+    return edges;
   }
 
   function styleHexLayer() {
@@ -342,39 +305,30 @@
                     ["*", (sc.m_ref || 1.1) * (kPrem - kBen), premP]];
       const costE = ["+", ["*", kPrem, premP],
                      ["-", ["to-number", ["get", suffix("npv_costs")]], premP]];
-      const dom = currentMapDomain(lay.key);
-      let colorExpr, stops;
-      if (dom && lay.key === "bcr") {
-        stops = bcrStops(dom[0], dom[1]);
-        const interp = ["interpolate", ["linear"], ["/", benE, costE]]
-          .concat(stops.flat());
-        colorExpr = ["case",
-          ["all", ["==", ["typeof", ["get", suffix("bcr")]], "number"],
-           [">", costE, 0]],
-          interp, NODATA];
-      } else if (dom) {
-        stops = benStops(dom[0], dom[1]);
-        const interp = ["interpolate", ["linear"],
-                        ["log10", ["max", benE, 1]]].concat(stops.flat());
-        colorExpr = ["case",
-          ["==", ["typeof", ["get", suffix("npv_benefits")]], "number"],
-          interp, NODATA];
-      }
-      if (colorExpr) {
-        map.setPaintProperty("hex-fill", "fill-color", colorExpr);
-      }
+      const bins = currentQuintileBins(lay.key);
       const label = lay.label + " — at " + Math.round(100 * currentP()) +
         "% practice / " + Math.round(100 * (state.prem || 0)) + "% premium" +
         (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "");
-      if (dom && lay.key === "npv_benefits") {
-        // legend gradient positions live in log space; label with real values
-        drawLegendContinuous(label, stops, stops[0][0],
-                             stops[stops.length - 1][0],
-                             (v) => fmtUsd(Math.pow(10, v)), null);
-      } else if (dom) {
-        drawLegendContinuous(label, stops, dom[0], dom[1],
-                             (v) => v.toFixed(1),
-                             dom[0] < 1 && dom[1] > 1 ? 1.0 : null);
+      if (bins) {
+        let ramp, valueExpr, guard;
+        if (lay.key === "bcr") {
+          ramp = bcrRamp(bins);
+          valueExpr = ["/", benE, costE];
+          guard = ["all", ["==", ["typeof", ["get", suffix("bcr")]], "number"],
+                   [">", costE, 0]];
+        } else {
+          // five quintile classes over GnBu
+          ramp = [RAMP_GNBU[1], RAMP_GNBU[2], RAMP_GNBU[4],
+                  RAMP_GNBU[5], RAMP_GNBU[6]];
+          valueExpr = benE;
+          guard = ["==", ["typeof", ["get", suffix("npv_benefits")]], "number"];
+        }
+        const step = ["step", valueExpr, ramp[0]];
+        bins.slice(0, ramp.length - 1).forEach((e, i) =>
+          step.push(e, ramp[Math.min(i + 1, ramp.length - 1)]));
+        map.setPaintProperty("hex-fill", "fill-color",
+                             ["case", guard, step, NODATA]);
+        drawLegend({ label: label, ramp: ramp, fmt: lay.fmt }, bins);
       }
     } else {
       const bins = binsFor(lay.key);
