@@ -381,16 +381,23 @@
     let s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" style="width:100%;height:auto">';
     s += '<line x1="' + PADL + '" x2="' + (W - PADR + 20) + '" y1="' + Y +
       '" y2="' + Y + '" stroke="#c3c2b7" stroke-width="2"/>';
+    const names = mp.code_names || {};
     events.forEach((e, i) => {
       const x = X(e.yr);
       const above = i % 2 === 0;
+      const codeName = names[e.lvl];
+      const plain = (CD_PLAIN[e.lvl] || e.lvl).replace(/^an? /, "");
       s += '<circle cx="' + x + '" cy="' + Y + '" r="6" fill="#2a78d6"/>' +
         '<text x="' + x + '" y="' + (Y + 20) +
         '" font-size="11" text-anchor="middle" fill="#52514e">' + e.yr + "</text>" +
         '<text x="' + x + '" y="' + (above ? Y - 14 : Y - 30) +
         '" font-size="11" text-anchor="middle" fill="#0b0b0b" font-weight="600">' +
-        (CD_PLAIN[e.lvl] || e.lvl).replace(/^a /, "").replace(/^an /, "") +
-        " (" + e.lvl + ")</text>";
+        (codeName || plain) + "</text>" +
+        (codeName
+          ? '<text x="' + x + '" y="' + (above ? Y - 3 : Y - 19) +
+            '" font-size="9" text-anchor="middle" fill="#898781">' +
+            plain + "</text>"
+          : "");
     });
     // the proposed step (dashed, at "next")
     const xp = W - PADR + 20;
@@ -471,18 +478,20 @@
     if (red) {
       const aalRef = red.aal_baseline_usd - k * (red.aal_baseline_usd - red.aal_reform_usd);
       const aalCut = red.aal_baseline_usd > 0 ? 100 * (1 - aalRef / red.aal_baseline_usd) : 0;
-      aalSub = sub("by " + red.year + ": " + fmtUsd(red.aal_baseline_usd) +
-        "/yr without reform → <b>−" + aalCut.toFixed(0) + "%</b> with it");
+      aalSub = sub("annual loss in " + red.year + ": " + fmtUsd(red.aal_baseline_usd) +
+        " without the reform vs <b>" + fmtUsd(aalRef) + "</b> with it (−" +
+        aalCut.toFixed(0) + "%)");
       const gdpRef = red.aal_gdp_baseline_pct -
         k * (red.aal_gdp_baseline_pct - red.aal_gdp_reform_pct);
-      gdpSub = sub("by " + red.year + ": " + red.aal_gdp_baseline_pct.toFixed(2) +
-        "% → <b>" + gdpRef.toFixed(2) + "%</b> of GDP with reform");
+      gdpSub = sub("in " + red.year + ": " + red.aal_gdp_baseline_pct.toFixed(2) +
+        "% of GDP without the reform vs <b>" + gdpRef.toFixed(2) + "%</b> with it");
       const fatRef = red.fatalities_baseline_yr -
         k * (red.fatalities_baseline_yr - red.fatalities_reform_yr);
       const fatCut = red.fatalities_baseline_yr > 0
         ? 100 * (1 - fatRef / red.fatalities_baseline_yr) : 0;
-      fatSub = sub("by " + red.year + ": " + fmtInt.format(red.fatalities_baseline_yr) +
-        "/yr without reform → <b>−" + fatCut.toFixed(0) + "%</b> with it");
+      fatSub = sub("expected deaths in " + red.year + ": " +
+        fmtInt.format(red.fatalities_baseline_yr) + "/yr without the reform vs <b>" +
+        fmtInt.format(fatRef) + "/yr</b> with it (−" + fatCut.toFixed(0) + "%)");
     }
     const dvCounts = ((horizonBlock(mp).dividends || {}).counts) || {};
     const tile = (ic, v, kk, s) => '<div class="tile">' + ic +
@@ -577,18 +586,16 @@
     disc.innerHTML = rates.map((r) =>
       '<button type="button" data-rate="' + r + '" aria-pressed="' + (r === state.disc) + '">' +
       Math.round(100 * r) + "%</button>").join("");
-    // one uniform structure everywhere: a labeled "default" button (the
-    // country's own level-jump premium) + the standard sensitivity steps
-    const fmtP = (p) => (100 * p).toFixed(p * 100 % 1 ? 1 : 0) + "%";
-    let html = "";
-    if (dflt != null) {
-      html += '<button type="button" data-pct="' + dflt + '" aria-pressed="true">default (' +
-        fmtP(dflt) + ")</button>";
-    }
-    html += pcts.filter((p) => dflt == null || Math.abs(p - dflt) > 1e-9)
-      .map((p) => '<button type="button" data-pct="' + p + '" aria-pressed="false">' +
-        fmtP(p) + "</button>").join("");
-    prem.innerHTML = html;
+    // one sorted row: the standard whole-percent steps with the country's own
+    // level-jump premium merged IN ORDER and marked with a dot
+    const allP = [...new Set([dflt, ...pcts].filter((v) => v != null))]
+      .sort((a, b) => a - b);
+    prem.innerHTML = allP.map((p) => {
+      const isD = dflt != null && Math.abs(p - dflt) < 1e-9;
+      return '<button type="button" data-pct="' + p + '" aria-pressed="' + isD +
+        '"' + (isD ? ' title="country default"' : "") + ">" +
+        Math.round(100 * p) + "%" + (isD ? " •" : "") + "</button>";
+    }).join("");
     document.querySelectorAll("#chart-mode button").forEach((b) =>
       b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)));
 
@@ -859,7 +866,7 @@
     if (!el) return;
     const cp = mp.compliance;
     if (!cp) {
-      el.innerHTML = "<p class='note'>No Atlas data for this country.</p>";
+      el.innerHTML = "<p class='note'>No Building Regulations Atlas data for this country.</p>";
       if (note) note.textContent = "";
       return;
     }
@@ -880,7 +887,7 @@
     if (cp.score) {
       html += '<div class="score-bar"><div class="fill" style="width:' +
         Math.round(100 * cp.score.score) + '%"></div></div>' +
-        '<div class="note" style="font-size:0.76rem">Atlas compliance-mechanisms score ' +
+        '<div class="note" style="font-size:0.76rem">Building Regulations Atlas compliance-mechanisms score ' +
         cp.score.score.toFixed(2) + " (" +
         Math.round(100 * cp.score.percentile) + "th percentile of " +
         cp.score.n_countries + " countries) — one input to the estimate above, " +
@@ -893,25 +900,43 @@
       const missing = items.filter((i) => i.status === "no" || i.status === "partial");
       const present = items.filter((i) => i.status === "yes");
       const unknown = items.filter((i) => !i.status);
-      if (it.kind === "enforcement" || (missing.length === 0 && present.length > 0)) {
-        // high-code countries: the regulations are complete on paper - the
-        // reform is about enforcement, not adding provisions
-        html += '<div style="font-size:0.84rem;margin-top:0.6rem"><strong>The code ' +
-          "on paper is not the constraint here.</strong> " +
-          (present.length ? "All " + present.length + " " : "The ") +
-          cp.structural.target + "-level structural provisions tracked by the " +
-          "Atlas are already in the country's regulations" +
-          (missing.length ? " (except: " + missing.map((i) => i.name).join("; ") + ")" : "") +
-          ". The reform modelled for this country is <strong>stronger " +
-          "enforcement</strong> — raising the share of construction that " +
-          "actually complies. The compliance packages below are the levers.</div>";
+      const allPresent = missing.length === 0 && present.length > 0;
+      if (it.kind === "enforcement") {
+        // high-code countries: the reform is enforcement, not provisions
+        html += '<div style="font-size:0.84rem;margin-top:0.6rem">' +
+          (allPresent
+            ? "All " + present.length + " " + cp.structural.target +
+              "-level structural provisions tracked by the Building Regulations " +
+              "Atlas already appear in the country's regulations. "
+            : "") +
+          "Note this checks the <em>presence</em> of provisions — code levels " +
+          "also reflect the stringency of lateral-force design requirements " +
+          "(Crowley et al. 2021), which the provision list alone cannot show. " +
+          "For this country the modelled reform is <strong>stronger " +
+          "enforcement</strong>: raising the share of construction that " +
+          "actually complies with the code already in force. The compliance " +
+          "packages below are the levers.</div>";
+      } else if (allPresent) {
+        // upgrade countries whose target-level provisions all exist on paper:
+        // the upgrade is about the DESIGN LEVEL demanded, not adding clauses
+        html += '<div style="font-size:0.84rem;margin-top:0.6rem">All ' +
+          present.length + " " + cp.structural.target + "-level structural " +
+          "provisions tracked by the Building Regulations Atlas already appear " +
+          "in the country's regulations. Having the provisions on paper is not " +
+          "the same as the code level: per Crowley et al. (2021), levels " +
+          "reflect the <em>stringency of lateral-force design requirements</em>. " +
+          "The modelled upgrade (" + (CD_PLAIN[it.in_force] || it.in_force) +
+          " → " + (CD_PLAIN[it.target] || it.target) + ") raises the design " +
+          "standard demanded of new construction — how strongly buildings must " +
+          "resist earthquake forces — rather than adding new provision " +
+          "types.</div>";
       } else {
         html += '<div style="font-size:0.84rem;margin-top:0.6rem"><strong>Reaching ' +
           cp.structural.target + "</strong> <span class='note'>(" +
           (cp.structural.label || "") + ")</span></div>";
         if (present.length) {
           html += '<div style="font-size:0.8rem;margin-top:0.35rem" class="pkg-ok">' +
-            "<strong>Already in the country's regulations</strong> (per the Atlas):</div>" +
+            "<strong>Already in the country's regulations</strong> (per the Building Regulations Atlas):</div>" +
             "<ul class='pkg-list'>" +
             present.map((i) => '<li class="pkg-ok">✓ ' + i.name + "</li>").join("") +
             "</ul>";
@@ -947,7 +972,7 @@
         "on compliance. Closing a package's gaps raises the share of buildings " +
         "actually built to code.</div>";
     }
-    el.innerHTML = html || "<p class='note'>No Atlas data for this country.</p>";
+    el.innerHTML = html || "<p class='note'>No Building Regulations Atlas data for this country.</p>";
     if (note) {
       note.textContent = (cp.structural && cp.structural.note ? cp.structural.note : "");
     }

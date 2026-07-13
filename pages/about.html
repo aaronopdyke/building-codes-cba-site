@@ -121,7 +121,7 @@
   <a href="https://www.gfdrr.org/en/building-regulations-atlas">GFDRR Building
   Regulations Atlas</a> and uses its indicators in two scoped ways:</p>
   <ul>
-    <li><strong>Structural-design packages</strong> — only the Atlas's
+    <li><strong>Structural-design packages</strong> — only the Building Regulations Atlas's
       <em>Building Design → Structural Resilience</em> indicators. Evaluating
       individual code provisions is beyond this analysis; instead they are
       grouped into the same code-level ladder the vulnerability model uses,
@@ -136,14 +136,14 @@
       <em>Compliance Mechanisms</em> indicators reduced to one factor per
       country with a rank-1 alternating-least-squares factor model fitted on
       observed entries only (a PCA analogue suited to binary items). This
-      handles the Atlas's uneven coverage — some indicators come from regional
+      handles the Building Regulations Atlas's uneven coverage — some indicators come from regional
       reports (e.g. Sub-Saharan Africa) and simply don't exist for other
       countries — because loadings are shared globally and each country is
       scored from whatever subset it has. The score enters the building
       practice factor as one weighted component (alongside governance,
       education and corruption measures). The practice factor is the model's
       estimate of the <em>share of new construction actually built to code</em> —
-      the site headlines that percentage; the Atlas score is a proxy input to
+      the site headlines that percentage; the Building Regulations Atlas score is a proxy input to
       it, not a compliance rate itself.</li>
     <li><strong>Compliance-improvement packages</strong> — groups of
       mechanisms (plan review, construction-phase inspections, professional
@@ -183,17 +183,23 @@
       (roughly 30% of the building cost — a stated HAZUS-order assumption, as GEM's
       structural-cost field is unpopulated; contents never bear a premium). The
       schedule is <strong>one global ladder</strong> — designing to a basic code
-      costs ~1% of structural cost over no code, a moderate code ~2.5%, a high
-      code ~5.5% — and each country's default premium is the <em>step for its own
+      costs 1% of structural cost over no code, a moderate code 3%, a high
+      code 6% — and each country's default premium is the <em>step for its own
       jump</em>: Malawi's first basic code costs 1%, Morocco's basic→moderate
-      1.5%, Nepal's moderate→high 3%, and Colombia's enforcement scenario prices
-      the full 5.5% high-code premium on newly-compliant construction. Defaults
+      2%, Nepal's moderate→high 3%, and Colombia's enforcement scenario prices
+      the full 6% high-code premium on newly-compliant construction. Defaults
       differ because the reforms differ, not the cost schedule. The premium
       control spans 1–12% around these. The premium applies to all complying new
       floor area regardless of local hazard — country-wide BCRs are lower than
       hazard-targeted enforcement.</li>
     <li>Compliance is scaled by a building practice factor (WGI + subnational
-      corruption + education, after Daniell et al. 2014).</li>
+      corruption + education, after Daniell et al. 2014, plus the Building
+      Regulations Atlas compliance score). The factor is distributed
+      <em>unevenly</em> across the stock: informal and non-engineered
+      construction bears much more of the non-compliance (adobe/earthen ×0.5,
+      unreinforced masonry ×0.6, timber ×0.8, confined masonry ×0.9 of the
+      national factor; engineered RC/steel ×1.0), and low-rise buildings less
+      than mid/high-rise (×0.8 / ×1.0 / ×1.2 by height class).</li>
     <li>The existing stock's code-level mix blends GHSL built-up vintage (the
       spatial pattern of older vs newer stock) with GEM's performance-based level
       shares per typology — so pre-code buildings that perform like low-code
