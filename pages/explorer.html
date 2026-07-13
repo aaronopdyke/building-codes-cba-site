@@ -21,6 +21,8 @@
 
 <div class="banner">Illustrative demo — modelled aggregates only; not for decision use without review.</div>
 
+<!-- everything that is an ANALYTICAL ASSUMPTION lives up here; changing it
+     flows through the tiles, chart, dividends and (except discount) the map -->
 <div class="controls">
   <div class="control-group">
     <label for="country-select">Country</label>
@@ -34,25 +36,17 @@
       <option value="75">75 years (2100)</option>
     </select>
   </div>
-  <div class="control-group" role="group" aria-label="Map view">
-    <label>Map</label>
-    <div class="segmented" id="view-toggle">
-      <button type="button" data-view="hazard" aria-pressed="false">Seismic&nbsp;hazard</button>
-      <button type="button" data-view="exposure" aria-pressed="false">Exposure&nbsp;2025</button>
-      <button type="button" data-view="growth" aria-pressed="false">Growth&nbsp;to&nbsp;2075</button>
-      <button type="button" data-view="risk" aria-pressed="true">Risk&nbsp;metrics</button>
-    </div>
+  <span class="chart-ctl"><label>Discount</label>
+    <div class="segmented" id="disc-toggle" role="group" aria-label="Discount rate"></div>
+  </span>
+  <span class="chart-ctl"><label title="Construction-cost increase, % of structural cost">Premium</label>
+    <div class="segmented" id="prem-toggle" role="group" aria-label="Construction premium"></div>
+  </span>
+  <div class="control-group bfp-group" title="Share of new construction actually built to code. Benefits, premium costs and lives saved scale with it; today's risk does not.">
+    <label for="bfp-slider">Practice&nbsp;factor</label>
+    <input type="range" id="bfp-slider" min="0" max="100" step="1" value="50">
+    <span class="bfp-val" id="bfp-value">–</span>
   </div>
-  <div class="control-group" role="group" aria-label="Risk metric" id="metric-group">
-    <label>Metric</label>
-    <div class="segmented" id="metric-toggle">
-      <button type="button" data-metric="bcr" aria-pressed="true">BCR</button>
-      <button type="button" data-metric="npv_benefits" aria-pressed="false">Total&nbsp;benefits</button>
-      <button type="button" data-metric="aal_2025" aria-pressed="false">Annual&nbsp;loss</button>
-      <button type="button" data-metric="aal_ratio" aria-pressed="false" title="Average annual earthquake loss as a share of building value">Loss&nbsp;rate</button>
-    </div>
-  </div>
-  <div class="legend" id="legend" aria-label="Map legend"></div>
 </div>
 
 <main class="explorer">
@@ -64,9 +58,26 @@
 
   <!-- map beside the economics panels; the map ends where the dividends end -->
   <div class="layout">
-    <div class="map-wrap">
-      <div id="map" aria-label="Hex-tile map of CBA results"></div>
-      <div class="map-tooltip" id="tooltip" role="status"></div>
+    <div class="map-col">
+      <div class="map-controls">
+        <div class="segmented" id="view-toggle" role="group" aria-label="Map view">
+          <button type="button" data-view="hazard" aria-pressed="false">Seismic&nbsp;hazard</button>
+          <button type="button" data-view="exposure" aria-pressed="false">Exposure&nbsp;2025</button>
+          <button type="button" data-view="growth" aria-pressed="false">Growth</button>
+          <button type="button" data-view="risk" aria-pressed="true">Risk&nbsp;metrics</button>
+        </div>
+        <div class="segmented" id="metric-toggle" role="group" aria-label="Risk metric">
+          <button type="button" data-metric="bcr" aria-pressed="true">BCR</button>
+          <button type="button" data-metric="npv_benefits" aria-pressed="false">Total&nbsp;benefits</button>
+          <button type="button" data-metric="aal_2025" aria-pressed="false">Annual&nbsp;loss</button>
+          <button type="button" data-metric="aal_ratio" aria-pressed="false" title="Average annual earthquake loss as a share of building value">Loss&nbsp;rate</button>
+        </div>
+      </div>
+      <div class="legend" id="legend" aria-label="Map legend"></div>
+      <div class="map-wrap">
+        <div id="map" aria-label="Hex-tile map of CBA results"></div>
+        <div class="map-tooltip" id="tooltip" role="status"></div>
+      </div>
     </div>
     <aside class="side">
       <section class="panel">
@@ -76,12 +87,6 @@
             <button type="button" data-mode="bc" aria-pressed="true">Benefits&nbsp;vs&nbsp;costs</button>
             <button type="button" data-mode="bcr" aria-pressed="false">Cumulative&nbsp;BCR</button>
           </div>
-          <span class="chart-ctl"><label>Discount</label>
-            <div class="segmented" id="disc-toggle" role="group" aria-label="Discount rate"></div>
-          </span>
-          <span class="chart-ctl"><label title="Construction-cost increase, % of structural cost">Premium</label>
-            <div class="segmented" id="prem-toggle" role="group" aria-label="Construction premium"></div>
-          </span>
         </div>
         <div id="streams-chart"></div>
         <p class="note" id="chart-note"></p>

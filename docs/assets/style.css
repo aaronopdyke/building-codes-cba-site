@@ -196,14 +196,21 @@ main.explorer .scenario { margin-top: 0; }
   gap: 0.9rem;
   align-items: stretch;   /* map height follows the panels beside it */
 }
+.map-col { display: flex; flex-direction: column; min-width: 0; gap: 0.45rem; }
+.map-controls { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
 .map-wrap {
   position: relative;
+  flex: 1;
   min-height: 480px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   overflow: hidden;
 }
 #map { position: absolute; inset: 0; }
+
+/* practice-factor slider (top assumptions bar) */
+.bfp-group input[type="range"] { width: 130px; accent-color: var(--accent); }
+.bfp-val { font-weight: 650; font-size: 0.85rem; min-width: 3ch; }
 .side { min-width: 0; }
 .side .panel:last-child { margin-bottom: 0; }
 @media (max-width: 900px) {

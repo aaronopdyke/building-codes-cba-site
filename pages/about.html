@@ -100,14 +100,21 @@
   (for the DALY comparison) and an assumed 40-year working career (for the jobs
   comparison — the World Bank publishes no expected-working-life indicator).</p>
 
-  <h2>Scenario toggles on the chart</h2>
-  <p class="note">The chart's discount-rate and construction-premium toggles
-  recompute costs and benefits client-side from the exported undiscounted flows —
-  both are linear, so the recombination is exact. The summary tiles, dividends
-  panel and map keep the headline assumptions (5% discount, the country's default
-  premium). Building-practice-factor sensitivity is <em>not</em> client-computable
-  (it acts nonlinearly through the vulnerability-curve mixing) and lives in the
-  notebook instead.</p>
+  <h2>Assumption controls</h2>
+  <p class="note">Everything that is an analytical assumption sits in the bar at
+  the top — horizon, discount rate, construction premium, and the
+  <strong>building practice factor</strong> (the share of new construction
+  actually built to code). Changing them recomputes the tiles, chart, dividends
+  and hex map client-side from the exported undiscounted flows. This is exact
+  for discount and premium (both linear), and exact for the practice factor
+  because benefits, premium costs and lives saved are <em>proportional</em> to
+  it — verified against full engine runs at 0.6–1.4× the default (deviation
+  &lt;1.3% within the slider's range; the slider is capped below where
+  height-class multipliers clip). Baseline AAL and expected fatalities do
+  <em>not</em> move with the practice factor: it governs only how much new
+  construction complies, not today's risk. One exception: the map's baked
+  values cannot be re-discounted, so the map holds the default discount rate
+  (noted in the legend when a different rate is selected).</p>
 
   <h2>Regulatory profile &amp; compliance (Building Regulations Atlas)</h2>
   <p>Each country page links to the

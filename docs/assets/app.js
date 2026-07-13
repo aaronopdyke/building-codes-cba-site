@@ -135,8 +135,11 @@
   }
 
   // ---------------- explorer ----------------
+  // bfpK = practice-factor multiplier vs the country default (1 = default).
+  // Benefits, premium costs and lives saved scale with it (verified
+  // proportional against engine runs); baseline AAL/fatalities do not.
   const state = { iso: null, view: "risk", metric: "bcr", horizon: 50,
-                  mode: "bc", disc: 0.05, prem: null };
+                  mode: "bc", disc: 0.05, prem: null, bfpK: 1 };
   const h = hashState();
   if (h.view && VIEWS.hasOwnProperty(h.view)) state.view = h.view;
   if (h.metric && METRICS[h.metric]) state.metric = h.metric;
@@ -189,11 +192,32 @@
     return (mp.hex.bins || {})[key] || [];
   }
 
-  function fillExpr(key, ramp, bins) {
+  function fillExpr(key, ramp, bins, inputExpr) {
     const edges = (bins && bins.length ? bins : [0]).slice(0, ramp.length - 1);
-    const step = ["step", ["get", key], ramp[0]];
+    const step = ["step", inputExpr || ["get", key], ramp[0]];
     edges.forEach((e, i) => step.push(e, ramp[Math.min(i + 1, ramp.length - 1)]));
     return ["case", ["==", ["typeof", ["get", key]], "number"], step, NODATA];
+  }
+
+  // the hex map follows the premium-% and practice-factor controls via
+  // computed paint expressions (benefits and the premium scale exactly;
+  // national implementation costs stay fixed). Discount cannot be re-applied
+  // to baked NPVs - the map stays at the default rate (noted in the legend).
+  function scaledMapExpr(key) {
+    const sc = country && country.scenarios;
+    if (!sc || !PER_H.has(key) || (key !== "bcr" && key !== "npv_benefits")) {
+      return null;
+    }
+    const kBen = state.bfpK;
+    const kPrem = state.bfpK *
+      ((state.prem || sc.default_premium_pct) / sc.default_premium_pct);
+    if (Math.abs(kBen - 1) < 1e-9 && Math.abs(kPrem - 1) < 1e-9) return null;
+    const ben = ["*", kBen, ["to-number", ["get", suffix("npv_benefits")]]];
+    if (key === "npv_benefits") return ben;
+    const premP = ["to-number", ["get", suffix("npv_premium")]];
+    const cost = ["+", ["*", kPrem, premP],
+                  ["-", ["to-number", ["get", suffix("npv_costs")]], premP]];
+    return ["case", [">", cost, 0], ["/", ben, cost], -1];
   }
 
   function drawLegend(lay, bins) {
@@ -231,12 +255,20 @@
     } else {
       const bins = binsFor(lay.key);
       const ramp = lay.ramp || (lay.key === "bcr" ? bcrRamp(bins) : RAMP_SEQ);
-      map.setPaintProperty("hex-fill", "fill-color", fillExpr(suffix(lay.key), ramp, bins));
-      drawLegend({ label: lay.label, ramp: ramp, fmt: lay.fmt }, bins);
+      const expr = scaledMapExpr(lay.key);
+      map.setPaintProperty("hex-fill", "fill-color",
+                           fillExpr(suffix(lay.key), ramp, bins, expr));
+      let label = lay.label;
+      if (expr) {
+        label += " — at " + Math.round(100 * currentP()) + "% practice / " +
+          (100 * (state.prem || 0)).toFixed(1) + "% premium" +
+          (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "");
+      }
+      drawLegend({ label: label, ramp: ramp, fmt: lay.fmt }, bins);
     }
     document.querySelectorAll("#metric-toggle button").forEach((b) =>
       b.setAttribute("aria-pressed", String(state.view === "risk" && b.dataset.metric === state.metric)));
-    document.getElementById("metric-group").style.display =
+    document.getElementById("metric-toggle").style.display =
       state.view === "risk" ? "" : "none";
     document.querySelectorAll("#view-toggle button").forEach((b) =>
       b.setAttribute("aria-pressed", String(b.dataset.view === state.view)));
@@ -247,17 +279,18 @@
   // linear in the premium %, so any (premium, discount, horizon) combination
   // is exact: costs_t = gov_up + gov_on + pct*premium_base_t;
   // benefits_t = d1_direct + d1_carbon + d3 + m_ref*ramp_t*costs_t.
-  function computeSeries(sc, ssp, pct, rate) {
+  function computeSeries(sc, ssp, pct, rate, k) {
     const s = sc.ssp[ssp];
     if (!s) return null;
+    k = k == null ? state.bfpK : k;
     const years = sc.years, t0 = sc.t0, step = sc.epoch_step;
     const cumB = [], cumC = [];
     let cb = 0, cc = 0;
     for (let i = 0; i < years.length; i++) {
       let d = 0;
       for (let y = 0; y < step; y++) d += Math.pow(1 + rate, -(years[i] - t0 + y));
-      const cost = s.gov_upfront[i] + s.gov_ongoing[i] + pct * s.premium_base[i];
-      const ben = s.d1_direct[i] + s.d1_carbon[i] + s.d3_durability[i] +
+      const cost = s.gov_upfront[i] + s.gov_ongoing[i] + k * pct * s.premium_base[i];
+      const ben = k * (s.d1_direct[i] + s.d1_carbon[i] + s.d3_durability[i]) +
         sc.m_ref * sc.ramp[i] * cost;
       cb += ben * d; cc += cost * d;
       cumB.push(cb); cumC.push(cc);
@@ -273,12 +306,15 @@
     return j >= 0 && r.cumC[j] > 0 ? r.cumB[j] / r.cumC[j] : null;
   }
 
-  // per-dividend NPVs at any (premium, discount, horizon) - same linear
-  // recombination as computeSeries, split by component so the triple-dividend
-  // panel tracks the chart toggles exactly
-  function componentNPVs(sc, ssp, pct, rate, hYear) {
+  // per-dividend NPVs at any (premium, discount, practice-k, horizon) - same
+  // linear recombination as the engine, split by component so the tiles,
+  // chart and dividends track the assumption controls exactly. The practice
+  // factor scales D1, D3, the premium and lives PROPORTIONALLY (engine-
+  // verified); government program costs are fixed.
+  function componentNPVs(sc, ssp, pct, rate, hYear, k) {
     const s = sc.ssp[ssp];
     if (!s) return null;
+    k = k == null ? state.bfpK : k;
     const t0 = sc.t0, step = sc.epoch_step;
     let d1 = 0, d2 = 0, d3 = 0, prem = 0, up = 0, on = 0;
     for (let i = 0; i < sc.years.length; i++) {
@@ -286,10 +322,10 @@
       if (t > hYear) break;
       let d = 0;
       for (let y = 0; y < step; y++) d += Math.pow(1 + rate, -(t - t0 + y));
-      const premT = pct * s.premium_base[i];
+      const premT = k * pct * s.premium_base[i];
       const cost = s.gov_upfront[i] + s.gov_ongoing[i] + premT;
-      d1 += (s.d1_direct[i] + s.d1_carbon[i]) * d;
-      d3 += s.d3_durability[i] * d;
+      d1 += k * (s.d1_direct[i] + s.d1_carbon[i]) * d;
+      d3 += k * s.d3_durability[i] * d;
       d2 += sc.m_ref * sc.ramp[i] * cost * d;
       prem += premT * d;
       up += s.gov_upfront[i] * d;
@@ -303,7 +339,18 @@
 
   function isDefaultSettings(sc) {
     return sc && Math.abs(state.disc - sc.default_discount) < 1e-9 &&
-      Math.abs((state.prem || 0) - sc.default_premium_pct) < 1e-9;
+      Math.abs((state.prem || 0) - sc.default_premium_pct) < 1e-9 &&
+      Math.abs(state.bfpK - 1) < 1e-9;
+  }
+  function settingsLabel() {
+    return Math.round(100 * state.disc) + "% discount, " +
+      (100 * (state.prem || 0)).toFixed(1) + "% premium, practice factor " +
+      Math.round(100 * currentP()) + "%";
+  }
+  function currentP() {
+    const sc = country && country.scenarios;
+    const p0 = sc && sc.bfp ? sc.bfp.p_national : null;
+    return p0 != null ? state.bfpK * p0 : state.bfpK;
   }
 
   function renderScenario(mp) {
@@ -348,39 +395,66 @@
     const tbl = sspTable(mp);
     const ssp2 = tbl.find((r) => r.ssp === "SSP2") || tbl[0];
     if (!ssp2) return;
-    // BCR follows the chart's discount/premium toggles (client recompute);
-    // physical counts (lives, DALYs, jobs) are toggle-independent
+    // BCR follows the assumption controls (client recompute); lives/DALYs/
+    // jobs-preserved scale with the practice factor; baseline AAL and
+    // fatalities do NOT (p only governs new-construction compliance)
     const sc = country.scenarios;
+    const k = state.bfpK;
     let bcr = ssp2.bcr, bcrNote = "";
-    if (sc && !isDefaultSettings(sc)) {
+    if (sc) {
       const c = componentNPVs(sc, ssp2.ssp, state.prem, state.disc, endYear());
       if (c && c.bcr != null) {
         bcr = c.bcr;
-        bcrNote = " @ " + Math.round(100 * state.disc) + "% / " +
-          (100 * state.prem).toFixed(1) + "%";
+        if (!isDefaultSettings(sc)) bcrNote = " (current settings)";
       }
     }
+    // scenario effect at horizon end, scaled by the practice factor: the
+    // AVOIDED part of AAL/fatalities is proportional to compliance
+    const red = horizonBlock(mp).reduction;
+    const sub = (t) => '<div class="sub">' + t + "</div>";
+    let aalSub = "", gdpSub = "", fatSub = "";
+    if (red) {
+      const aalRef = red.aal_baseline_usd - k * (red.aal_baseline_usd - red.aal_reform_usd);
+      const aalCut = red.aal_baseline_usd > 0 ? 100 * (1 - aalRef / red.aal_baseline_usd) : 0;
+      aalSub = sub("by " + red.year + ": " + fmtUsd(red.aal_baseline_usd) +
+        "/yr without reform → <b>−" + aalCut.toFixed(0) + "%</b> with it");
+      const gdpRef = red.aal_gdp_baseline_pct -
+        k * (red.aal_gdp_baseline_pct - red.aal_gdp_reform_pct);
+      gdpSub = sub("by " + red.year + ": " + red.aal_gdp_baseline_pct.toFixed(2) +
+        "% → <b>" + gdpRef.toFixed(2) + "%</b> of GDP with reform");
+      const fatRef = red.fatalities_baseline_yr -
+        k * (red.fatalities_baseline_yr - red.fatalities_reform_yr);
+      const fatCut = red.fatalities_baseline_yr > 0
+        ? 100 * (1 - fatRef / red.fatalities_baseline_yr) : 0;
+      fatSub = sub("by " + red.year + ": " + fmtInt.format(red.fatalities_baseline_yr) +
+        "/yr without reform → <b>−" + fatCut.toFixed(0) + "%</b> with it");
+    }
     const dvCounts = ((horizonBlock(mp).dividends || {}).counts) || {};
-    const tile = (ic, v, k) => '<div class="tile">' + ic +
-      '<div><div class="v">' + v + '</div><div class="k">' + k + "</div></div></div>";
+    const tile = (ic, v, kk, s) => '<div class="tile">' + ic +
+      '<div><div class="v">' + v + '</div><div class="k">' + kk + "</div>" +
+      (s || "") + "</div></div>";
     const group = (label, tiles) => '<div class="tgroup"><h4>' + label +
       '</h4><div class="tiles">' + tiles.join("") + "</div></div>";
     document.getElementById("tiles").innerHTML =
       group("Damage & loss", [
-        tile(ICONS.aal, fmtUsd(m.baseline_aal_2025_usd) + "/yr", "Average annual loss (2025)"),
-        tile(ICONS.gdp, (100 * m.aal_pct_gdp_2025).toFixed(1) + "%", "Annual loss as % of GDP"),
+        tile(ICONS.aal, fmtUsd(m.baseline_aal_2025_usd) + "/yr",
+             "Average annual loss (2025)", aalSub),
+        tile(ICONS.gdp, (100 * m.aal_pct_gdp_2025).toFixed(1) + "%",
+             "Annual loss as % of GDP", gdpSub),
         tile(ICONS.bcr, bcr.toFixed(2), "Benefit-cost ratio — SSP2, " +
              state.horizon + " yrs" + bcrNote),
       ]) +
       group("Lives", [
         tile(ICONS.fatalities, fmtInt.format(m.baseline_fatalities_2025_per_yr),
-             "Expected fatalities /yr (today)"),
-        tile(ICONS.lives, fmtInt.format(ssp2.lives_saved), "Lives saved to " + endYear()),
-        tile(ICONS.dalys, ssp2.dalys_averted != null ? fmtInt.format(ssp2.dalys_averted) : "–",
+             "Expected fatalities /yr (today)", fatSub),
+        tile(ICONS.lives, fmtInt.format(k * ssp2.lives_saved),
+             "Lives saved to " + endYear()),
+        tile(ICONS.dalys, ssp2.dalys_averted != null
+             ? fmtInt.format(k * ssp2.dalys_averted) : "–",
              "Healthy life-years protected (DALYs)"),
       ]) +
       group("Jobs", [
-        tile(ICONS.jobs, fmtInt.format(ssp2.job_years), "Job-years preserved"),
+        tile(ICONS.jobs, fmtInt.format(k * ssp2.job_years), "Job-years preserved"),
         tile(ICONS.gdp, dvCounts.job_years_created != null
              ? fmtInt.format(dvCounts.job_years_created) : "–",
              "Job-years created (stimulus)"),
@@ -407,18 +481,19 @@
         (ctx.emdat_note || "earthquake deaths (EM-DAT)") + ".");
     }
     if (ssp2.dalys_averted && ctx.life_expectancy) {
-      const n = ssp2.dalys_averted / ctx.life_expectancy;
+      const dalys = k * ssp2.dalys_averted;
+      const n = dalys / ctx.life_expectancy;
       items.push("<strong>DALYs:</strong> a DALY is one lost year of healthy life. " +
-        fmtInt.format(ssp2.dalys_averted) + " DALYs averted is equivalent to the " +
+        fmtInt.format(dalys) + " DALYs averted is equivalent to the " +
         "full lifetimes of about " + fmtInt.format(n) + " people, at " + name +
         "'s life expectancy of " + ctx.life_expectancy + " years (World Bank" +
         (ctx.life_expectancy_year ? " " + ctx.life_expectancy_year : "") + ").");
     }
     if (ssp2.job_years) {
       const wl = ctx.working_life_years || 40;
-      const careers = ssp2.job_years / wl;
-      items.push("<strong>Jobs:</strong> " + fmtInt.format(ssp2.job_years) +
-        " job-years preserved is the equivalent of about " + fmtInt.format(careers) +
+      const jy = k * ssp2.job_years;
+      items.push("<strong>Jobs:</strong> " + fmtInt.format(jy) +
+        " job-years preserved is the equivalent of about " + fmtInt.format(jy / wl) +
         " entire working careers (assuming a " + Math.round(wl) + "-year career).");
     }
     document.getElementById("tile-context").innerHTML =
@@ -461,6 +536,30 @@
     prem.innerHTML = html;
     document.querySelectorAll("#chart-mode button").forEach((b) =>
       b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)));
+
+    // practice-factor slider: range from the exported proportional-validity
+    // window (k_max stays below the height-multiplier clip)
+    const slider = document.getElementById("bfp-slider");
+    const bfp = sc && sc.bfp;
+    state.bfpK = 1;
+    if (slider && bfp) {
+      slider.min = Math.round(100 * bfp.k_min);
+      slider.max = Math.round(100 * bfp.k_max);
+      slider.value = 100;
+      slider.disabled = false;
+    } else if (slider) {
+      slider.disabled = true;
+    }
+    updateBfpLabel();
+  }
+
+  function updateBfpLabel() {
+    const el = document.getElementById("bfp-value");
+    if (!el) return;
+    const sc = country && country.scenarios;
+    if (!sc || !sc.bfp) { el.textContent = "–"; return; }
+    el.textContent = Math.round(100 * currentP()) + "%" +
+      (Math.abs(state.bfpK - 1) < 1e-9 ? " (default)" : "");
   }
 
   function svgFrame(W, H, PAD, xmin, xmax, ymax, yfmt) {
@@ -568,14 +667,14 @@
     const bcr2 = b2.cumC[b2.cumC.length - 1] > 0 ? b2.cumB[b2.cumB.length - 1] / b2.cumC[b2.cumC.length - 1] : null;
     note.textContent =
       "Benefits sum all three resilience dividends (avoided losses + carbon, GDP stimulus, " +
-      "durability) — the same basis as the BCR tile and the dividends panel, which follow " +
-      "these settings. Over " + state.horizon +
-      " years at " + Math.round(100 * state.disc) + "% discount and a " +
-      (100 * (state.prem || 0)).toFixed(1) + "% construction premium: NPV benefits " +
+      "durability) — same basis as the tiles, dividends and map, all following the " +
+      "assumption controls above. Over " + state.horizon + " years at " + settingsLabel() +
+      ": NPV benefits " +
       fmtUsd(b2.cumB[b2.cumB.length - 1]) + " vs costs " + fmtUsd(b2.cumC[b2.cumC.length - 1]) +
       ", BCR " + (bcr2 != null ? bcr2.toFixed(2) : "–") + " (SSP2); across SSPs " +
       Math.min(...bcrs).toFixed(2) + "–" + Math.max(...bcrs).toFixed(2) + "." +
-      (isDefaultSettings(sc) ? "" : " The map keeps the headline assumptions.") +
+      (Math.abs(state.disc - (sc ? sc.default_discount : 0.05)) > 1e-9
+        ? " (The map cannot re-discount — it stays at the default rate.)" : "") +
       " Lives and DALYs are never monetised.";
   }
 
@@ -642,15 +741,14 @@
     el.innerHTML =
       '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;margin-bottom:0.5rem">' +
       bar + "</svg><table>" + rows + "</table>";
+    const k = state.bfpK;
     note.innerHTML =
       (cc && !isDefaultSettings(sc)
-        ? "At the chart's settings — " + Math.round(100 * state.disc) +
-          "% discount, " + (100 * state.prem).toFixed(1) + "% premium; the map " +
-          "keeps the headline assumptions. "
+        ? "At the current assumptions — " + settingsLabel() + ". "
         : "") +
-      "Counts (not $): lives saved " + fmtInt.format(c.lives_saved || 0) +
-      " · DALYs " + fmtInt.format(c.dalys_averted || 0) +
-      " · job-years preserved " + fmtInt.format(c.job_years_preserved || 0) +
+      "Counts (not $): lives saved " + fmtInt.format(k * (c.lives_saved || 0)) +
+      " · DALYs " + fmtInt.format(k * (c.dalys_averted || 0)) +
+      " · job-years preserved " + fmtInt.format(k * (c.job_years_preserved || 0)) +
       " + created " + fmtInt.format(c.job_years_created || 0) + ". " +
       'Framework: <a href="' + dv.url + '">Triple Dividend of Resilience</a> ' +
       "(Tanner et al., ODI/GFDRR/World Bank).";
@@ -734,28 +832,43 @@
         "alongside governance, education and corruption measures. A proxy for " +
         "compliance, not the compliance rate itself.</div>";
     }
+    const it = (mp.metrics || {}).intervention || {};
     if (cp.structural) {
       const items = cp.structural.items || [];
       const missing = items.filter((i) => i.status === "no" || i.status === "partial");
       const present = items.filter((i) => i.status === "yes");
       const unknown = items.filter((i) => !i.status);
-      html += '<div style="font-size:0.84rem;margin-top:0.6rem"><strong>Reaching ' +
-        cp.structural.target + "</strong> <span class='note'>(" +
-        (cp.structural.label || "") + ")</span></div>";
-      if (present.length) {
-        html += '<div style="font-size:0.8rem;margin-top:0.35rem" class="pkg-ok">' +
-          "<strong>Already in the country's regulations</strong> (per the Atlas):</div>" +
-          "<ul class='pkg-list'>" +
-          present.map((i) => '<li class="pkg-ok">✓ ' + i.name + "</li>").join("") +
-          "</ul>";
-      }
-      if (missing.length) {
-        html += '<div style="font-size:0.8rem;margin-top:0.35rem" class="pkg-gap">' +
-          "<strong>Not identified — what the upgrade package would add:</strong></div>" +
-          "<ul class='pkg-list'>" +
-          missing.map((i) => '<li class="pkg-gap">✗ ' + i.name +
-            (i.status === "partial" ? " (currently partial)" : "") + "</li>").join("") +
-          "</ul>";
+      if (it.kind === "enforcement" || (missing.length === 0 && present.length > 0)) {
+        // high-code countries: the regulations are complete on paper - the
+        // reform is about enforcement, not adding provisions
+        html += '<div style="font-size:0.84rem;margin-top:0.6rem"><strong>The code ' +
+          "on paper is not the constraint here.</strong> " +
+          (present.length ? "All " + present.length + " " : "The ") +
+          cp.structural.target + "-level structural provisions tracked by the " +
+          "Atlas are already in the country's regulations" +
+          (missing.length ? " (except: " + missing.map((i) => i.name).join("; ") + ")" : "") +
+          ". The reform modelled for this country is <strong>stronger " +
+          "enforcement</strong> — raising the share of construction that " +
+          "actually complies. The compliance packages below are the levers.</div>";
+      } else {
+        html += '<div style="font-size:0.84rem;margin-top:0.6rem"><strong>Reaching ' +
+          cp.structural.target + "</strong> <span class='note'>(" +
+          (cp.structural.label || "") + ")</span></div>";
+        if (present.length) {
+          html += '<div style="font-size:0.8rem;margin-top:0.35rem" class="pkg-ok">' +
+            "<strong>Already in the country's regulations</strong> (per the Atlas):</div>" +
+            "<ul class='pkg-list'>" +
+            present.map((i) => '<li class="pkg-ok">✓ ' + i.name + "</li>").join("") +
+            "</ul>";
+        }
+        if (missing.length) {
+          html += '<div style="font-size:0.8rem;margin-top:0.35rem" class="pkg-gap">' +
+            "<strong>Not identified — what the upgrade package would add:</strong></div>" +
+            "<ul class='pkg-list'>" +
+            missing.map((i) => '<li class="pkg-gap">✗ ' + i.name +
+              (i.status === "partial" ? " (currently partial)" : "") + "</li>").join("") +
+            "</ul>";
+        }
       }
       if (unknown.length) {
         html += '<div class="note" style="font-size:0.76rem">Not assessed for ' +
@@ -766,9 +879,12 @@
     if (pkgs.length) {
       html += '<div style="font-size:0.84rem;margin-top:0.6rem"><strong>Compliance-improvement packages</strong></div>' +
         '<div class="table-wrap"><table><tr><th>Package</th>' +
-        "<th class=num>Missing mechanisms</th></tr>";
+        '<th class=num>Missing</th><th>What is missing</th></tr>';
       pkgs.forEach((p2) => {
+        const names = (p2.gap_names || []).join("; ");
         html += "<tr><td>" + p2.label + '</td><td class="num">' + p2.n_gaps +
+          '</td><td style="white-space:normal;font-size:0.74rem;color:var(--ink-2)">' +
+          (names || (p2.n_gaps === 0 ? "nothing — already complete" : "–")) +
           "</td></tr>";
       });
       html += "</table></div>" +
@@ -782,6 +898,19 @@
     }
   }
 
+  // plain-language names for what a building was DESIGNED to (or not)
+  const CD_SHORT = { CDN: "no code", CDL: "basic code", CDM: "moderate code",
+                     CDH: "high code" };
+  function plainAction(action) {
+    if (!action) return "–";
+    const m = String(action).match(/CD([NLMH]).*?->.*?CD([NLMH])/);
+    if (m) {
+      return "redesign to " + (CD_SHORT["CD" + m[2]] || m[2]) + " performance";
+    }
+    if (/strengthen/i.test(action)) return "strengthen (heuristic)";
+    return action;
+  }
+
   function renderRetrofit(rj) {
     const tbl = document.getElementById("retrofit-table");
     if (!rj) { tbl.innerHTML = "<tr><td>No retrofit data.</td></tr>"; return; }
@@ -790,12 +919,19 @@
     const nameOf = (r) =>
       idx["class_label"] != null && r[idx["class_label"]] ? r[idx["class_label"]] : r[idx["class"]];
     tbl.innerHTML =
-      "<tr><th>Building class</th><th>Level</th><th class=num>Avoided AAL</th><th class=num>Lives/yr</th><th class=num>BCR</th></tr>" +
-      rows.map((r) =>
-        '<tr><td title="' + r[idx["class"]] + '">' + nameOf(r) + "</td><td>" + r[idx["current_level"]] +
-        '</td><td class=num>' + fmtUsd(r[idx["avoided_aal_usd"]]) + "/yr</td><td class=num>" +
-        (+r[idx["avoided_fatalities_yr"]]).toFixed(1) + "</td><td class=num>" +
-        (+r[idx["bcr_retrofit"]]).toFixed(2) + "</td></tr>").join("");
+      "<tr><th>Building class</th><th>Currently built to</th><th>Retrofit modelled</th>" +
+      "<th class=num>Avoided AAL</th><th class=num>Lives/yr</th><th class=num>BCR</th></tr>" +
+      rows.map((r) => {
+        const lvl = r[idx["current_level"]];
+        const plainLvl = lvl && CD_SHORT[lvl]
+          ? CD_SHORT[lvl] : "not engineered";
+        return '<tr><td title="' + r[idx["class"]] + '">' + nameOf(r) +
+          "</td><td>" + plainLvl +
+          "</td><td>" + plainAction(r[idx["retrofit_action"]]) +
+          '</td><td class=num>' + fmtUsd(r[idx["avoided_aal_usd"]]) + "/yr</td><td class=num>" +
+          (+r[idx["avoided_fatalities_yr"]]).toFixed(1) + "</td><td class=num>" +
+          (+r[idx["bcr_retrofit"]]).toFixed(2) + "</td></tr>";
+      }).join("");
     const a = rj.assumptions || {};
     document.getElementById("retrofit-note").textContent =
       "Screening assumptions: engineered classes +1 code level; non-engineered −" +
@@ -895,13 +1031,24 @@
 
   function showHexTooltip(p, point, isPinned) {
     const lay = activeLayer();
-    const bcr = p[suffix("bcr")];
+    // rescale money metrics per the assumption controls (same math as the map)
+    const sc = country && country.scenarios;
+    const kBen = state.bfpK;
+    const kPrem = sc ? state.bfpK *
+      ((state.prem || sc.default_premium_pct) / sc.default_premium_pct) : 1;
+    const prem = +p[suffix("npv_premium")] || 0;
+    const cost = kPrem * prem + ((+p[suffix("npv_costs")] || 0) - prem);
+    const ben = kBen * (+p[suffix("npv_benefits")] || 0);
+    const bcr = cost > 0 ? ben / cost : null;
+    let val = p[suffix(lay.key)];
+    if (lay.key === "bcr") val = bcr;
+    else if (lay.key === "npv_benefits") val = ben;
     tooltip.style.display = "block";
     tooltip.style.left = point.x + 14 + "px";
     tooltip.style.top = point.y + 14 + "px";
     tooltip.innerHTML =
       (isPinned ? "📌 " : "") +
-      "<strong>" + lay.label + ": " + lay.fmt(p[suffix(lay.key)]) + "</strong><br>" +
+      "<strong>" + lay.label + ": " + lay.fmt(val) + "</strong><br>" +
       "hazard " + (p.pga_475 != null ? p.pga_475.toFixed(2) + " g" : "–") +
       " · value " + fmtUsd(p.repl_value) +
       "<br>annual loss " + fmtUsd(p.aal_2025) + "/yr · BCR " +
@@ -1016,6 +1163,7 @@
     document.querySelectorAll("#disc-toggle button").forEach((b) =>
       b.setAttribute("aria-pressed", String(+b.dataset.rate === state.disc)));
     renderEconomics();
+    styleHexLayer();   // refresh the "map discount fixed" legend note
   });
   document.getElementById("prem-toggle").addEventListener("click", (ev) => {
     const btn = ev.target.closest("button[data-pct]");
@@ -1024,6 +1172,13 @@
     document.querySelectorAll("#prem-toggle button").forEach((b) =>
       b.setAttribute("aria-pressed", String(+b.dataset.pct === state.prem)));
     renderEconomics();
+    styleHexLayer();   // the map follows the premium too
+  });
+  document.getElementById("bfp-slider").addEventListener("input", () => {
+    state.bfpK = +document.getElementById("bfp-slider").value / 100;
+    updateBfpLabel();
+    renderEconomics();
+    styleHexLayer();   // benefits/premium scale on the map as well
   });
   document.getElementById("adm1-table").addEventListener("click", (ev) => {
     const th = ev.target.closest("th.sortable");
