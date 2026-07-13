@@ -183,11 +183,51 @@ a:hover { text-decoration: underline; }
    sections follow full-width below. */
 .map-page { min-height: 100vh; display: flex; flex-direction: column; }
 .map-page main { flex: 1; min-height: 0; }
+/* assumptions sidebar + content */
+.page-wrap {
+  display: grid;
+  grid-template-columns: 235px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 1450px;
+  margin: 0 auto;
+}
+.assumptions {
+  padding: 0.9rem 0.9rem 1.2rem;
+  border-right: 1px solid var(--hairline);
+  background: var(--surface);
+}
+.assumptions h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.assumptions .control-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+  margin-bottom: 0.85rem;
+}
+.assumptions .control-group > label { font-size: 0.8rem; color: var(--ink-2); }
+.assumptions .segmented { flex-wrap: wrap; }
+.assumptions .segmented button { padding: 0.22rem 0.5rem; font-size: 0.78rem; }
+.assumptions select { width: 100%; }
+.assumptions .bfp-group input[type="range"] { width: 100%; }
+@media (max-width: 900px) {
+  .page-wrap { grid-template-columns: 1fr; }
+  .assumptions { border-right: 0; border-bottom: 1px solid var(--hairline); }
+}
+
 main.explorer {
   width: 100%;
   max-width: 1250px;
-  margin: 0 auto;
+  margin: 0;
   padding: 0.9rem 1.25rem 1.5rem;
+  min-width: 0;
 }
 main.explorer .scenario { margin-top: 0; }
 .layout {

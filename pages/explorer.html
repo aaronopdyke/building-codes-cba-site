@@ -21,9 +21,11 @@
 
 <div class="banner">Illustrative demo — modelled aggregates only; not for decision use without review.</div>
 
-<!-- everything that is an ANALYTICAL ASSUMPTION lives up here; changing it
-     flows through the tiles, chart, dividends and (except discount) the map -->
-<div class="controls">
+<div class="page-wrap">
+<!-- everything that is an ANALYTICAL ASSUMPTION lives in this sidebar;
+     changing it flows through the tiles, chart, dividends and the map -->
+<aside class="assumptions" aria-label="Analysis assumptions">
+  <h3>Assumptions</h3>
   <div class="control-group">
     <label for="country-select">Country</label>
     <select id="country-select"></select>
@@ -36,21 +38,22 @@
       <option value="75">75 years (2100)</option>
     </select>
   </div>
-  <span class="chart-ctl"><label>Discount</label>
+  <div class="control-group">
+    <label>Discount rate</label>
     <div class="segmented" id="disc-toggle" role="group" aria-label="Discount rate"></div>
-  </span>
-  <span class="chart-ctl"><label title="Construction-cost increase, % of structural cost">Premium</label>
+  </div>
+  <div class="control-group">
+    <label title="Construction-cost increase, % of structural cost">Construction premium</label>
     <div class="segmented" id="prem-toggle" role="group" aria-label="Construction premium"></div>
-  </span>
+  </div>
   <div class="control-group bfp-group" title="Share of new construction actually built to code. Benefits, premium costs and lives saved scale with it; today's risk does not.">
-    <label for="bfp-slider">Practice&nbsp;factor</label>
+    <label for="bfp-slider">Practice factor</label>
     <input type="range" id="bfp-slider" min="0" max="100" step="1" value="50">
     <span class="bfp-val" id="bfp-value">–</span>
   </div>
-</div>
+</aside>
 
 <main class="explorer">
-  <div class="code-timeline" id="code-timeline" aria-label="Building-code adoption timeline"></div>
   <p class="scenario" id="scenario"></p>
 
   <!-- map beside the economics panels; the map ends where the dividends end -->
@@ -96,8 +99,12 @@
     </aside>
   </div>
 
-  <!-- headline statistics: one full-width row under the map, grouped -->
-  <div class="tile-groups" id="tiles" style="margin-top:0.9rem"></div>
+  <!-- code-adoption history, under the map -->
+  <div class="code-timeline" id="code-timeline" style="margin-top:0.9rem"
+       aria-label="Building-code adoption timeline"></div>
+
+  <!-- headline statistics: one full-width row, grouped -->
+  <div class="tile-groups" id="tiles"></div>
   <ul class="tile-context" id="tile-context"></ul>
 
   <section class="band">
@@ -135,6 +142,7 @@
     </div>
   </section>
 </main>
+</div>
 
 <footer class="site-footer">
   © CC BY-NC-SA 4.0 ·

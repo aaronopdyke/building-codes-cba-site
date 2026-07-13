@@ -261,57 +261,50 @@
       "<span>" + fmt(hi) + "</span></span></span>";
   }
 
-  // fixed color domains for the toggle-sensitive metrics: BCR and total
-  // benefits across the WHOLE control space (practice-factor range x premium
-  // 1-12%), pooled over all horizons; p2/p98 so one outlier hex can't stretch
-  // the ramp. Both quantities are monotone in each control, so the corner
-  // combinations per hex give the exact extremes.
-  function computeMapDomains(hex, sc) {
-    if (!sc || !sc.bfp || !hex) return null;
-    const kLo = sc.bfp.k_min, kHi = sc.bfp.k_max;
-    const p0 = sc.default_premium_pct, m = sc.m_ref || 1.1;
-    const rLo = Math.min(...sc.premium_pcts, p0) / p0;
-    const rHi = Math.max(...sc.premium_pcts, p0) / p0;
-    const bcrLo = [], bcrHi = [], benVals = [];
-    (hex.features || []).forEach((f) => {
+  // color domain for the toggle-sensitive metrics: the min/max of the cells
+  // AT THE CURRENT SETTING (p2/p98 so one outlier hex can't flatten the
+  // ramp) - full within-map contrast; the legend restates the setting.
+  function currentMapDomain(key) {
+    const sc = country && country.scenarios;
+    const feats = country && country.hexFeatures;
+    if (!sc || !feats) return null;
+    const k = state.bfpK, m = sc.m_ref || 1.1;
+    const r = (state.prem || sc.default_premium_pct) / sc.default_premium_pct;
+    const vals = [];
+    feats.forEach((f) => {
       const p = f.properties;
-      [25, 50, 75].forEach((y) => {
-        const B = +p["npv_benefits_h" + y], C = +p["npv_costs_h" + y],
-              P = +p["npv_premium_h" + y];
-        if (!isFinite(B) || !isFinite(C) || !isFinite(P) || B <= 0) return;
-        const ben = (k, r) => k * B + m * (k * r - k) * P;
-        const cost = (k, r) => k * r * P + (C - P);
-        if (ben(kHi, rHi) > 0) benVals.push(ben(kHi, rHi));
-        // BCR max at (k_max, premium_min); min at (k_min, premium_max)
-        if (cost(kHi, rLo) > 0) bcrHi.push(ben(kHi, rLo) / cost(kHi, rLo));
-        if (cost(kLo, rHi) > 0) bcrLo.push(ben(kLo, rHi) / cost(kLo, rHi));
-      });
+      const B = +p[suffix("npv_benefits")], C = +p[suffix("npv_costs")],
+            P = +p[suffix("npv_premium")];
+      if (!isFinite(B) || !isFinite(C) || !isFinite(P) || B <= 0) return;
+      const ben = k * B + m * (k * r - k) * P;
+      const cost = k * r * P + (C - P);
+      if (key === "bcr") {
+        if (cost > 0 && ben > 0) vals.push(ben / cost);
+      } else if (ben > 0) {
+        vals.push(ben);
+      }
     });
-    const q = (arr, f) => {
-      if (!arr.length) return null;
-      arr.sort((a, b) => a - b);
-      return arr[Math.min(arr.length - 1, Math.max(0, Math.floor(f * arr.length)))];
-    };
-    const bLo = Math.max(0, q(bcrLo, 0.02) || 0);
-    const bHi = Math.max(q(bcrHi, 0.98) || 2, 1.2);
-    return {
-      bcr: [Math.min(bLo, 0.99), bHi],   // keep 1.0 inside the scale
-      ben: [Math.max(1, q(benVals, 0.02) || 1),
-            Math.max(q(benVals, 0.98) || 10, 10)],
-    };
+    if (vals.length < 4) return null;
+    vals.sort((a, b) => a - b);
+    const q = (f) => vals[Math.min(vals.length - 1,
+                                   Math.max(0, Math.floor(f * vals.length)))];
+    let lo = q(0.02), hi = q(0.98);
+    if (hi - lo < 1e-9) { lo *= 0.9; hi *= 1.1; }
+    return [lo, hi];
   }
 
-  // interpolation stops for the continuous ramps
+  // interpolation stops for the continuous BCR ramp (diverging around 1.0
+  // when the range straddles it; single-hue otherwise)
   function bcrStops(lo, hi) {
-    const s = [];
-    if (lo < 1) {
-      s.push([lo, BCR_REDS[0]], [(lo + 1) / 2, BCR_REDS[2]], [1.0, "#f7f7f7"]);
-    } else {
-      s.push([lo, "#f7f7f7"]);
+    if (hi <= 1) {   // everything below break-even: reds only
+      return [[lo, BCR_REDS[0]], [(lo + hi) / 2, BCR_REDS[2]], [hi, "#fddbc7"]];
     }
-    s.push([1 + (hi - 1) * 0.33, BCR_BLUES[1]],
-           [1 + (hi - 1) * 0.66, BCR_BLUES[2]], [hi, BCR_BLUES[4]]);
-    return s;
+    if (lo >= 1) {   // everything above break-even: blues only
+      return [[lo, BCR_BLUES[0]], [lo + (hi - lo) * 0.5, BCR_BLUES[2]],
+              [hi, BCR_BLUES[4]]];
+    }
+    return [[lo, BCR_REDS[0]], [(lo + 1) / 2, BCR_REDS[2]], [1.0, "#f7f7f7"],
+            [1 + (hi - 1) * 0.5, BCR_BLUES[2]], [hi, BCR_BLUES[4]]];
   }
   function benStops(lo, hi) {   // positions in log10 space
     const l0 = Math.log10(lo), l1 = Math.log10(hi);
@@ -337,9 +330,9 @@
       drawLegend({ label: lay.label, ramp: hz.colors, fmt: lay.fmt },
                  hz.bins.slice(0, hz.colors.length - 1));
     } else if ((lay.key === "bcr" || lay.key === "npv_benefits") &&
-               country.mapDomains) {
-      // continuous linear ramp on a FIXED domain spanning the whole control
-      // space - colors stay comparable as the toggles move
+               country.hexFeatures && country.scenarios) {
+      // continuous linear ramp, rescaled to the min/max of the cells AT THE
+      // CURRENT SETTING - full within-map contrast at every combination
       const sc = country.scenarios;
       const kBen = state.bfpK;
       const kPrem = state.bfpK *
@@ -349,9 +342,9 @@
                     ["*", (sc.m_ref || 1.1) * (kPrem - kBen), premP]];
       const costE = ["+", ["*", kPrem, premP],
                      ["-", ["to-number", ["get", suffix("npv_costs")]], premP]];
-      let colorExpr, dom, stops, fmtL, mid;
-      if (lay.key === "bcr") {
-        dom = country.mapDomains.bcr;
+      const dom = currentMapDomain(lay.key);
+      let colorExpr, stops;
+      if (dom && lay.key === "bcr") {
         stops = bcrStops(dom[0], dom[1]);
         const interp = ["interpolate", ["linear"], ["/", benE, costE]]
           .concat(stops.flat());
@@ -359,30 +352,29 @@
           ["all", ["==", ["typeof", ["get", suffix("bcr")]], "number"],
            [">", costE, 0]],
           interp, NODATA];
-        fmtL = (v) => v.toFixed(1);
-        mid = 1.0;
-      } else {
-        dom = country.mapDomains.ben;
+      } else if (dom) {
         stops = benStops(dom[0], dom[1]);
         const interp = ["interpolate", ["linear"],
                         ["log10", ["max", benE, 1]]].concat(stops.flat());
         colorExpr = ["case",
           ["==", ["typeof", ["get", suffix("npv_benefits")]], "number"],
           interp, NODATA];
-        fmtL = fmtUsd;
       }
-      map.setPaintProperty("hex-fill", "fill-color", colorExpr);
+      if (colorExpr) {
+        map.setPaintProperty("hex-fill", "fill-color", colorExpr);
+      }
       const label = lay.label + " — at " + Math.round(100 * currentP()) +
         "% practice / " + Math.round(100 * (state.prem || 0)) + "% premium" +
-        (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "") +
-        " · fixed scale across all settings";
-      if (lay.key === "npv_benefits") {
+        (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "");
+      if (dom && lay.key === "npv_benefits") {
         // legend gradient positions live in log space; label with real values
         drawLegendContinuous(label, stops, stops[0][0],
                              stops[stops.length - 1][0],
                              (v) => fmtUsd(Math.pow(10, v)), null);
-      } else {
-        drawLegendContinuous(label, stops, dom[0], dom[1], fmtL, mid);
+      } else if (dom) {
+        drawLegendContinuous(label, stops, dom[0], dom[1],
+                             (v) => v.toFixed(1),
+                             dom[0] < 1 && dom[1] > 1 ? 1.0 : null);
       }
     } else {
       const bins = binsFor(lay.key);
@@ -1178,7 +1170,7 @@
       json(base + "boundaries.geojson").catch(() => null),
     ]);
     country = { metrics_payload: mp, scenarios: sc, adm1: adm1,
-                mapDomains: computeMapDomains(hex, sc) };
+                hexFeatures: hex.features || [] };
     if (mp.horizon_years && !mp.horizon_years.includes(state.horizon)) {
       state.horizon = mp.default_horizon || mp.horizon_years[0];
       horizonSelect.value = String(state.horizon);
