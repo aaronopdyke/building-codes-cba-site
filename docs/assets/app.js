@@ -240,29 +240,29 @@
     el.innerHTML = htmlStr;
   }
 
-  // quintile bin edges for the toggle-sensitive metrics, computed from the
-  // cells AT THE CURRENT SETTING - five balanced classes at every combination
-  // (same quantile approach as the loss metrics); the legend restates the
-  // setting. BCR bins additionally get the 1.0 edge inserted whenever the
-  // range straddles it, so the red/blue break-even split survives.
-  function currentQuintileBins(key) {
+  // quintile bin edges for the toggle-sensitive metrics, computed ONCE per
+  // (metric, horizon) at the country's DEFAULT setting and then held FIXED
+  // while the premium / practice-factor controls move. Values shift across
+  // stable classes (monotonic, no flicker); recomputing bins per setting
+  // would move the edges together with the values and make near-boundary
+  // cells jump classes on every slider tick. BCR bins get the 1.0 edge
+  // inserted when the default range straddles it (break-even split).
+  function defaultQuintileBins(key) {
     const sc = country && country.scenarios;
     const feats = country && country.hexFeatures;
     if (!sc || !feats) return null;
-    const k = state.bfpK, m = sc.m_ref || 1.1;
-    const r = (state.prem || sc.default_premium_pct) / sc.default_premium_pct;
+    country._bins = country._bins || {};
+    const cacheKey = key + "_h" + state.horizon;
+    if (country._bins[cacheKey]) return country._bins[cacheKey];
     const vals = [];
     feats.forEach((f) => {
       const p = f.properties;
-      const B = +p[suffix("npv_benefits")], C = +p[suffix("npv_costs")],
-            P = +p[suffix("npv_premium")];
-      if (!isFinite(B) || !isFinite(C) || !isFinite(P) || B <= 0) return;
-      const ben = k * B + m * (k * r - k) * P;
-      const cost = k * r * P + (C - P);
+      const B = +p[suffix("npv_benefits")], C = +p[suffix("npv_costs")];
+      if (!isFinite(B) || !isFinite(C) || B <= 0) return;
       if (key === "bcr") {
-        if (cost > 0 && ben > 0) vals.push(ben / cost);
-      } else if (ben > 0) {
-        vals.push(ben);
+        if (C > 0) vals.push(B / C);
+      } else {
+        vals.push(B);
       }
     });
     if (vals.length < 10) return null;
@@ -273,6 +273,7 @@
       edges.push(1.0);   // keep the break-even split
     }
     edges = [...new Set(edges.map((e) => +e.toPrecision(3)))].sort((a, b) => a - b);
+    country._bins[cacheKey] = edges;
     return edges;
   }
 
@@ -305,10 +306,11 @@
                     ["*", (sc.m_ref || 1.1) * (kPrem - kBen), premP]];
       const costE = ["+", ["*", kPrem, premP],
                      ["-", ["to-number", ["get", suffix("npv_costs")]], premP]];
-      const bins = currentQuintileBins(lay.key);
+      const bins = defaultQuintileBins(lay.key);
       const label = lay.label + " — at " + Math.round(100 * currentP()) +
         "% practice / " + Math.round(100 * (state.prem || 0)) + "% premium" +
-        (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "");
+        (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "") +
+        " · classes fixed at the default setting";
       if (bins) {
         let ramp, valueExpr, guard;
         if (lay.key === "bcr") {
