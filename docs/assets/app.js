@@ -60,7 +60,8 @@
   }
 
   // metrics stored per horizon in the hex/adm1 payloads (suffixed _h25/_h50/_h75)
-  const PER_H = new Set(["bcr", "npv_benefits", "npv_costs", "fa_growth", "lives"]);
+  const PER_H = new Set(["bcr", "npv_benefits", "npv_costs", "npv_premium",
+                         "fa_growth", "lives"]);
 
   // risk metrics (the "Risk metrics" view); labels get the horizon injected
   const METRICS = {
@@ -212,9 +213,12 @@
     const kPrem = state.bfpK *
       ((state.prem || sc.default_premium_pct) / sc.default_premium_pct);
     if (Math.abs(kBen - 1) < 1e-9 && Math.abs(kPrem - 1) < 1e-9) return null;
-    const ben = ["*", kBen, ["to-number", ["get", suffix("npv_benefits")]]];
-    if (key === "npv_benefits") return ben;
     const premP = ["to-number", ["get", suffix("npv_premium")]];
+    // benefits: D1+D3+stimulus all scale with the practice factor; a premium
+    // change additionally moves the premium-side D2 stimulus (~m_ref x prem)
+    const ben = ["+", ["*", kBen, ["to-number", ["get", suffix("npv_benefits")]]],
+                 ["*", (sc.m_ref || 1.1) * (kPrem - kBen), premP]];
+    if (key === "npv_benefits") return ben;
     const cost = ["+", ["*", kPrem, premP],
                   ["-", ["to-number", ["get", suffix("npv_costs")]], premP]];
     return ["case", [">", cost, 0], ["/", ben, cost], -1];
@@ -351,6 +355,57 @@
     const sc = country && country.scenarios;
     const p0 = sc && sc.bfp ? sc.bfp.p_national : null;
     return p0 != null ? state.bfpK * p0 : state.bfpK;
+  }
+
+  // adoption timeline: when the country adopted each code level, and the
+  // proposed step this scenario models
+  function renderTimeline(mp) {
+    const el = document.getElementById("code-timeline");
+    if (!el) return;
+    const ad = mp.code_adoption || {};
+    const it = (mp.metrics || {}).intervention || {};
+    const events = Object.entries(ad)
+      .map(([lvl, yr]) => ({ lvl: lvl, yr: +yr }))
+      .sort((a, b) => a.yr - b.yr);
+    const name = mp.name || mp.iso3;
+    if (!events.length) {
+      el.innerHTML = '<div class="tl-empty"><strong>' + name +
+        " has never adopted a mandatory building code.</strong> The scenario " +
+        "introduces the first one (" + (CD_PLAIN[it.target] || it.target) + ").</div>";
+      return;
+    }
+    const W = 900, H = 74, PADL = 30, PADR = 150, Y = 46;
+    const y0 = Math.min(events[0].yr - 6, 1985);
+    const y1 = 2026;
+    const X = (yr) => PADL + ((yr - y0) / (y1 - y0)) * (W - PADL - PADR);
+    let s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" style="width:100%;height:auto">';
+    s += '<line x1="' + PADL + '" x2="' + (W - PADR + 20) + '" y1="' + Y +
+      '" y2="' + Y + '" stroke="#c3c2b7" stroke-width="2"/>';
+    events.forEach((e, i) => {
+      const x = X(e.yr);
+      const above = i % 2 === 0;
+      s += '<circle cx="' + x + '" cy="' + Y + '" r="6" fill="#2a78d6"/>' +
+        '<text x="' + x + '" y="' + (Y + 20) +
+        '" font-size="11" text-anchor="middle" fill="#52514e">' + e.yr + "</text>" +
+        '<text x="' + x + '" y="' + (above ? Y - 14 : Y - 30) +
+        '" font-size="11" text-anchor="middle" fill="#0b0b0b" font-weight="600">' +
+        (CD_PLAIN[e.lvl] || e.lvl).replace(/^a /, "").replace(/^an /, "") +
+        " (" + e.lvl + ")</text>";
+    });
+    // the proposed step (dashed, at "next")
+    const xp = W - PADR + 20;
+    const propLabel = it.kind === "enforcement"
+      ? "proposed: stronger enforcement"
+      : "proposed: " + (CD_PLAIN[it.target] || it.target || "").replace(/^a /, "") +
+        (it.target ? " (" + it.target + ")" : "");
+    s += '<line x1="' + xp + '" x2="' + (xp + 26) + '" y1="' + Y + '" y2="' + Y +
+      '" stroke="#e8a33d" stroke-width="2" stroke-dasharray="4 3"/>' +
+      '<circle cx="' + (xp + 26) + '" cy="' + Y + '" r="6" fill="none" ' +
+      'stroke="#e8a33d" stroke-width="2"/>' +
+      '<text x="' + (xp + 34) + '" y="' + (Y + 4) +
+      '" font-size="11" fill="#7a5a00">' + propLabel + "</text>";
+    s += "</svg>";
+    el.innerHTML = s;
   }
 
   function renderScenario(mp) {
@@ -944,6 +999,7 @@
   function renderAll() {
     const mp = country.metrics_payload;
     styleHexLayer();
+    renderTimeline(mp);
     renderScenario(mp);
     renderTiles(mp);
     renderChart();
@@ -1038,7 +1094,8 @@
       ((state.prem || sc.default_premium_pct) / sc.default_premium_pct) : 1;
     const prem = +p[suffix("npv_premium")] || 0;
     const cost = kPrem * prem + ((+p[suffix("npv_costs")] || 0) - prem);
-    const ben = kBen * (+p[suffix("npv_benefits")] || 0);
+    const ben = kBen * (+p[suffix("npv_benefits")] || 0) +
+      ((sc && sc.m_ref) || 1.1) * (kPrem - kBen) * prem;
     const bcr = cost > 0 ? ben / cost : null;
     let val = p[suffix(lay.key)];
     if (lay.key === "bcr") val = bcr;

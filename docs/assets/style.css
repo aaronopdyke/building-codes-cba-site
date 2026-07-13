@@ -208,6 +208,16 @@ main.explorer .scenario { margin-top: 0; }
 }
 #map { position: absolute; inset: 0; }
 
+/* code-adoption timeline */
+.code-timeline {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 0.2rem 0.8rem 0;
+  margin-bottom: 0.6rem;
+}
+.code-timeline .tl-empty { font-size: 0.86rem; color: var(--ink-2); padding: 0.5rem 0; }
+
 /* practice-factor slider (top assumptions bar) */
 .bfp-group input[type="range"] { width: 130px; accent-color: var(--accent); }
 .bfp-val { font-weight: 650; font-size: 0.85rem; min-width: 3ch; }

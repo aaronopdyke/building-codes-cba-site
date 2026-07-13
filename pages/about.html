@@ -181,10 +181,17 @@
     <li>The construction premium is priced as a percentage of the
       <strong>structural share</strong> of each location's unit construction cost
       (roughly 30% of the building cost — a stated HAZUS-order assumption, as GEM's
-      structural-cost field is unpopulated; contents never bear a premium). Default
-      3% for a one-level upgrade; the chart's premium toggle spans 1–12%. The
-      premium applies to all complying new floor area regardless of local hazard —
-      country-wide BCRs are lower than hazard-targeted enforcement.</li>
+      structural-cost field is unpopulated; contents never bear a premium). The
+      schedule is <strong>one global ladder</strong> — designing to a basic code
+      costs ~1% of structural cost over no code, a moderate code ~2.5%, a high
+      code ~5.5% — and each country's default premium is the <em>step for its own
+      jump</em>: Malawi's first basic code costs 1%, Morocco's basic→moderate
+      1.5%, Nepal's moderate→high 3%, and Colombia's enforcement scenario prices
+      the full 5.5% high-code premium on newly-compliant construction. Defaults
+      differ because the reforms differ, not the cost schedule. The premium
+      control spans 1–12% around these. The premium applies to all complying new
+      floor area regardless of local hazard — country-wide BCRs are lower than
+      hazard-targeted enforcement.</li>
     <li>Compliance is scaled by a building practice factor (WGI + subnational
       corruption + education, after Daniell et al. 2014).</li>
     <li>The existing stock's code-level mix blends GHSL built-up vintage (the
