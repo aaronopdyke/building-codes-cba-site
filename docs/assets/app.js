@@ -240,29 +240,53 @@
     el.innerHTML = htmlStr;
   }
 
-  // quintile bin edges for the toggle-sensitive metrics, computed ONCE per
-  // (metric, horizon) at the country's DEFAULT setting and then held FIXED
-  // while the premium / practice-factor controls move. Values shift across
-  // stable classes (monotonic, no flicker); recomputing bins per setting
-  // would move the edges together with the values and make near-boundary
-  // cells jump classes on every slider tick. BCR bins get the 1.0 edge
-  // inserted when the default range straddles it (break-even split).
-  function defaultQuintileBins(key) {
+  // discount scaling for the map: baked hex NPVs are at the default rate;
+  // for another rate we scale each component by its NATIONAL time-profile
+  // ratio (benefits / premium / gov streams discount differently). National
+  // totals stay exact; per-cell values assume the national time profile - a
+  // stated approximation (the legend flags it).
+  function discountFactors() {
+    const sc = country && country.scenarios;
+    if (!sc) return { fBen: 1, fPrem: 1, fGov: 1, approx: false };
+    const d0 = sc.default_discount;
+    if (Math.abs(state.disc - d0) < 1e-9) {
+      return { fBen: 1, fPrem: 1, fGov: 1, approx: false };
+    }
+    const pct = state.prem || sc.default_premium_pct;
+    const cD = componentNPVs(sc, "SSP2", pct, state.disc, endYear());
+    const c0 = componentNPVs(sc, "SSP2", pct, d0, endYear());
+    if (!cD || !c0) return { fBen: 1, fPrem: 1, fGov: 1, approx: false };
+    const safe = (a, b) => (b > 0 ? a / b : 1);
+    return { fBen: safe(cD.total, c0.total),
+             fPrem: safe(cD.prem, c0.prem),
+             fGov: safe(cD.gov_up + cD.gov_on, c0.gov_up + c0.gov_on),
+             approx: true };
+  }
+
+  // quintile bin edges recomputed for the CURRENTLY selected assumptions -
+  // the classes always split the current map into five balanced groups.
+  // Edges are used UNROUNDED in the paint expression (rounding them per tick
+  // is what made near-boundary cells flicker); the legend rounds for display
+  // only. BCR bins get the 1.0 edge inserted when the range straddles it.
+  function settingQuintileBins(key) {
     const sc = country && country.scenarios;
     const feats = country && country.hexFeatures;
     if (!sc || !feats) return null;
-    country._bins = country._bins || {};
-    const cacheKey = key + "_h" + state.horizon;
-    if (country._bins[cacheKey]) return country._bins[cacheKey];
+    const k = state.bfpK, m = sc.m_ref || 1.1;
+    const r = (state.prem || sc.default_premium_pct) / sc.default_premium_pct;
+    const df = discountFactors();
     const vals = [];
     feats.forEach((f) => {
       const p = f.properties;
-      const B = +p[suffix("npv_benefits")], C = +p[suffix("npv_costs")];
-      if (!isFinite(B) || !isFinite(C) || B <= 0) return;
+      const B = +p[suffix("npv_benefits")], C = +p[suffix("npv_costs")],
+            P = +p[suffix("npv_premium")];
+      if (!isFinite(B) || !isFinite(C) || !isFinite(P) || B <= 0) return;
+      const ben = df.fBen * (k * B + m * (k * r - k) * P);
+      const cost = df.fPrem * k * r * P + df.fGov * (C - P);
       if (key === "bcr") {
-        if (C > 0) vals.push(B / C);
-      } else {
-        vals.push(B);
+        if (cost > 0 && ben > 0) vals.push(ben / cost);
+      } else if (ben > 0) {
+        vals.push(ben);
       }
     });
     if (vals.length < 10) return null;
@@ -272,9 +296,7 @@
     if (key === "bcr" && vals[0] < 1 && vals[vals.length - 1] > 1) {
       edges.push(1.0);   // keep the break-even split
     }
-    edges = [...new Set(edges.map((e) => +e.toPrecision(3)))].sort((a, b) => a - b);
-    country._bins[cacheKey] = edges;
-    return edges;
+    return [...new Set(edges)].sort((a, b) => a - b);
   }
 
   function styleHexLayer() {
@@ -301,16 +323,21 @@
       const kBen = state.bfpK;
       const kPrem = state.bfpK *
         ((state.prem || sc.default_premium_pct) / sc.default_premium_pct);
+      const df = discountFactors();
       const premP = ["to-number", ["get", suffix("npv_premium")]];
-      const benE = ["+", ["*", kBen, ["to-number", ["get", suffix("npv_benefits")]]],
-                    ["*", (sc.m_ref || 1.1) * (kPrem - kBen), premP]];
-      const costE = ["+", ["*", kPrem, premP],
-                     ["-", ["to-number", ["get", suffix("npv_costs")]], premP]];
-      const bins = defaultQuintileBins(lay.key);
+      const benE = ["*", df.fBen,
+                    ["+", ["*", kBen, ["to-number", ["get", suffix("npv_benefits")]]],
+                     ["*", (sc.m_ref || 1.1) * (kPrem - kBen), premP]]];
+      const costE = ["+", ["*", df.fPrem * kPrem, premP],
+                     ["*", df.fGov,
+                      ["-", ["to-number", ["get", suffix("npv_costs")]], premP]]];
+      const bins = settingQuintileBins(lay.key);
       const label = lay.label + " — at " + Math.round(100 * currentP()) +
-        "% practice / " + Math.round(100 * (state.prem || 0)) + "% premium" +
-        (Math.abs(state.disc - 0.05) > 1e-9 ? " (map discount fixed at 5%)" : "") +
-        " · classes fixed at the default setting";
+        "% practice / " + Math.round(100 * (state.prem || 0)) + "% premium / " +
+        Math.round(100 * state.disc) + "% discount" +
+        (df.approx ? " (discount via national time profile — per-cell approximation)"
+                   : "") +
+        " · quintiles at this setting";
       if (bins) {
         let ramp, valueExpr, guard;
         if (lay.key === "bcr") {
@@ -816,7 +843,8 @@
       ", BCR " + (bcr2 != null ? bcr2.toFixed(2) : "–") + " (SSP2); across SSPs " +
       Math.min(...bcrs).toFixed(2) + "–" + Math.max(...bcrs).toFixed(2) + "." +
       (Math.abs(state.disc - (sc ? sc.default_discount : 0.05)) > 1e-9
-        ? " (The map cannot re-discount — it stays at the default rate.)" : "") +
+        ? " (On the map, the discount is applied through the national time" +
+          " profile — a per-cell approximation.)" : "") +
       " Lives and DALYs are never monetised.";
   }
 
@@ -1198,10 +1226,12 @@
     const kBen = state.bfpK;
     const kPrem = sc ? state.bfpK *
       ((state.prem || sc.default_premium_pct) / sc.default_premium_pct) : 1;
+    const df = discountFactors();
     const prem = +p[suffix("npv_premium")] || 0;
-    const cost = kPrem * prem + ((+p[suffix("npv_costs")] || 0) - prem);
-    const ben = kBen * (+p[suffix("npv_benefits")] || 0) +
-      ((sc && sc.m_ref) || 1.1) * (kPrem - kBen) * prem;
+    const cost = df.fPrem * kPrem * prem +
+      df.fGov * ((+p[suffix("npv_costs")] || 0) - prem);
+    const ben = df.fBen * (kBen * (+p[suffix("npv_benefits")] || 0) +
+      ((sc && sc.m_ref) || 1.1) * (kPrem - kBen) * prem);
     const bcr = cost > 0 ? ben / cost : null;
     let val = p[suffix(lay.key)];
     if (lay.key === "bcr") val = bcr;

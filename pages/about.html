@@ -112,9 +112,13 @@
   &lt;1.3% within the slider's range; the slider is capped below where
   height-class multipliers clip). Baseline AAL and expected fatalities do
   <em>not</em> move with the practice factor: it governs only how much new
-  construction complies, not today's risk. One exception: the map's baked
-  values cannot be re-discounted, so the map holds the default discount rate
-  (noted in the legend when a different rate is selected).</p>
+  construction complies, not today's risk. One approximation: the map's baked
+  per-cell NPVs cannot be exactly re-discounted, so a non-default discount rate
+  is applied to the map by scaling each component (benefits, premium,
+  government costs) by its <em>national</em> time-profile ratio — national
+  totals stay exact, per-cell values assume the national timing (flagged in
+  the legend). Map classes are quintiles of the currently selected assumptions,
+  recomputed as the controls move.</p>
 
   <h2>Regulatory profile &amp; compliance (Building Regulations Atlas)</h2>
   <p>Each country page links to the
