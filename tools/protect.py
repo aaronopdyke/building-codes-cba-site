@@ -63,8 +63,12 @@ TEMPLATE = """<!DOCTYPE html>
 </div>
 <script>
 const SALT = "{salt}", IV = "{iv}", DATA = "{data}", ITER = {iterations};
+const DATA_SHA256 = "{data_sha256}";
 const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 async function unlock(pwText) {{
+  // trim + normalize unicode dashes/spaces that autocorrect sneaks in
+  pwText = pwText.trim().replace(/[\\u2010-\\u2015\\u2212]/g, "-")
+                 .replace(/\\u00a0/g, " ");
   const pw = new TextEncoder().encode(pwText);
   const km = await crypto.subtle.importKey("raw", pw, "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey(
@@ -76,6 +80,24 @@ async function unlock(pwText) {{
   try {{ sessionStorage.setItem("bccba_pw", pwText); }} catch (e) {{}}
   document.open(); document.write(html); document.close();
 }}
+// distinguish the real failure modes instead of a blanket "wrong password"
+async function diagnose() {{
+  if (!window.crypto || !crypto.subtle) {{
+    return "This browser cannot decrypt the page (no WebCrypto - use a " +
+           "current browser over HTTPS; some corporate policies disable it).";
+  }}
+  try {{
+    const raw = b64(DATA);
+    const digest = await crypto.subtle.digest("SHA-256", raw);
+    const hex = [...new Uint8Array(digest)]
+      .map(b => b.toString(16).padStart(2, "0")).join("");
+    if (DATA_SHA256 && hex !== DATA_SHA256) {{
+      return "The page did not load completely (cached/corrupted copy) - " +
+             "hard-refresh (Ctrl+F5) and try again.";
+    }}
+  }} catch (e) {{ /* fall through */ }}
+  return "Wrong password.";
+}}
 document.getElementById("f").addEventListener("submit", async ev => {{
   ev.preventDefault();
   const err = document.getElementById("err");
@@ -83,7 +105,7 @@ document.getElementById("f").addEventListener("submit", async ev => {{
   try {{
     await unlock(document.getElementById("pw").value);
   }} catch (e) {{
-    err.textContent = "Wrong password.";
+    err.textContent = await diagnose();
   }}
 }});
 // enter the password once per browser tab: reuse it silently across pages
@@ -112,6 +134,7 @@ def encrypt_page(src, dst, password):
     out = TEMPLATE.format(salt=base64.b64encode(salt).decode(),
                           iv=base64.b64encode(iv).decode(),
                           data=base64.b64encode(ct).decode(),
+                          data_sha256=hashlib.sha256(ct).hexdigest(),
                           iterations=ITERATIONS)
     with open(dst, 'w', encoding='utf-8') as f:
         f.write(out)
