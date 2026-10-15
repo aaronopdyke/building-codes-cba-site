@@ -162,7 +162,7 @@
       sources: {
         basemap: {
           type: "raster",
-          tiles: ["https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"],
+          tiles: ["https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png?key=cb1_4log_1_5afcc37ed146da738507be13"],
           tileSize: 256,
           attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
         },
